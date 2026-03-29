@@ -1,0 +1,41 @@
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import AdminDashboard from './pages/Admin/AdminDashboard';
+import PatientLogin from './pages/Patient/PatientLogin';
+import PatientDashboard from './pages/Patient/PatientDashboard';
+import DoctorLogin from './pages/Doctor/DoctorLogin';
+import DoctorDashboard from './pages/Doctor/DoctorDashboard';
+import ConsultationRoom from './pages/Doctor/ConsultationRoom';
+import PatientConsultationRoom from './pages/Patient/PatientConsultationRoom';
+import Header from './components/Header';
+import './index.css';
+
+function App() {
+  return (
+    <BrowserRouter>
+      <div className="app-container">
+        <Header />
+        <main className="main-content">
+          <Routes>
+            <Route path="/" element={<Navigate to="/patient/login" />} />
+            
+            {/* Admin Routes */}
+            <Route path="/admin/*" element={<AdminDashboard />} />
+
+            {/* Patient Routes */}
+            <Route path="/patient/login" element={<PatientLogin />} />
+            <Route path="/patient/dashboard" element={<PatientDashboard />} />
+            <Route path="/patient/consultation/:roomId" element={<PatientConsultationRoom />} />
+
+            {/* Doctor Routes */}
+            <Route path="/doctor/login" element={<DoctorLogin />} />
+            <Route path="/doctor/dashboard" element={<DoctorDashboard />} />
+            <Route path="/doctor/consultation/:roomId" element={<ConsultationRoom />} />
+          </Routes>
+        </main>
+      </div>
+    </BrowserRouter>
+  );
+}
+
+export default App;
