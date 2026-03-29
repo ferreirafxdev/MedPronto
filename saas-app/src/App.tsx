@@ -1,12 +1,14 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import AdminDashboard from './pages/Admin/AdminDashboard';
+import AdminLogin from './pages/Admin/AdminLogin';
 import PatientLogin from './pages/Patient/PatientLogin';
 import PatientDashboard from './pages/Patient/PatientDashboard';
 import DoctorLogin from './pages/Doctor/DoctorLogin';
 import DoctorDashboard from './pages/Doctor/DoctorDashboard';
 import ConsultationRoom from './pages/Doctor/ConsultationRoom';
 import PatientConsultationRoom from './pages/Patient/PatientConsultationRoom';
+import HomePage from './pages/HomePage';
 import Header from './components/Header';
 import './index.css';
 
@@ -17,10 +19,11 @@ function App() {
         <Header />
         <main className="main-content">
           <Routes>
-            <Route path="/" element={<Navigate to="/patient/login" />} />
+            <Route path="/" element={<HomePage />} />
             
             {/* Admin Routes */}
-            <Route path="/admin/*" element={<AdminDashboard />} />
+            <Route path="/admin/login" element={<AdminLogin />} />
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
 
             {/* Patient Routes */}
             <Route path="/patient/login" element={<PatientLogin />} />

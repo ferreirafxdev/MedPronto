@@ -40,12 +40,17 @@ const ConsultationRoom = () => {
       if(window.confirm("Deseja encerrar e gerar o PDF do prontuário? Ele será salvo no Supabase S3.")) {
           setLoading(true);
           try {
-             await axios.post('http://localhost:3001/api/end-consultation', {
+             const endResp = await axios.post('http://localhost:3001/api/end-consultation', {
                  patientId: roomId,
                  doctorId: user?.id,
                  notes, prescriptions, exams
              });
-             alert("Prontuário salvo com sucesso e consulta encerrada.");
+             
+             if(endResp.data.pdf_url) {
+                 window.open(endResp.data.pdf_url, '_blank');
+             }
+             
+             alert("✅ Atendimento finalizado! +R$ 60,00 somados. O PDF foi aberto para impressão/S3.");
              navigate('/doctor/dashboard');
           } catch(err) {
              console.error(err);

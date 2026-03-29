@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useStore } from '../../store/useStore';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { Users, FileUser, PlayCircle } from 'lucide-react';
+import { Users, FileUser, PlayCircle, DollarSign, CheckCircle } from 'lucide-react';
 
 interface QueuedPatient {
   id: string;
@@ -16,6 +16,8 @@ const DoctorDashboard = () => {
   const { user, setConsultationRoomId } = useStore();
   const navigate = useNavigate();
   const [queue, setQueue] = useState<QueuedPatient[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [stats, setStats] = useState({ totalConsultations: 0, earnings: 0 });
 
   useEffect(() => {
     if (!user || user.role !== 'doctor') {
@@ -23,32 +25,38 @@ const DoctorDashboard = () => {
       return;
     }
 
-    const fetchQueue = async () => {
+    const fetchData = async () => {
       try {
-        const resp = await axios.get('http://localhost:3001/api/queue');
-        setQueue(resp.data);
+        const [qResp, sResp] = await Promise.all([
+            axios.get('http://localhost:3001/api/queue'),
+            axios.get(`http://localhost:3001/api/doctor/stats/${user.id}`)
+        ]);
+        
+        if (qResp.data.success) setQueue(qResp.data.queue);
+        if (sResp.data.success) setStats(sResp.data.stats);
       } catch (error) {
-        console.error("Erro ao buscar fila", error);
+        console.error("Erro ao sincronizar dados", error);
       }
     };
 
-    fetchQueue();
-    // In a real app we would use Socket.io here to auto-refresh the queue
-    const interval = setInterval(fetchQueue, 5000);
+    fetchData();
+    const interval = setInterval(fetchData, 10000); // 10s refresh
     return () => clearInterval(interval);
   }, [user, navigate]);
 
   const takePatient = async () => {
     try {
+      setLoading(true);
       const resp = await axios.post('http://localhost:3001/api/take-patient', { doctorId: user?.id });
       if (resp.data.success) {
         const { patient } = resp.data;
-        setConsultationRoomId(patient.id); // For simplicity, room is patient.id
+        setConsultationRoomId(patient.id);
         navigate(`/doctor/consultation/${patient.id}`);
       }
     } catch (error) {
       alert("A fila está vazia ou ocorreu um erro.");
-      console.error(error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -63,6 +71,27 @@ const DoctorDashboard = () => {
         <button onClick={takePatient} className="btn btn-secondary" style={{ padding: '1rem 2rem', fontSize: '1.2rem', gap: '0.8rem', animation: 'pulse 2s infinite' }}>
           <PlayCircle size={24} /> Chamar Próximo da Fila
         </button>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
+        <div className="feature-card" style={{ padding: '1.5rem', backgroundColor: '#ffffff' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ padding: '0.8rem', backgroundColor: '#dcfce7', borderRadius: '1rem' }}><DollarSign size={24} color="#166534" /></div>
+                <div>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Renda do Dia (R$ 60/consulta)</span>
+                    <h2 style={{ margin: 0 }}>R$ {stats.earnings.toLocaleString('pt-BR')}</h2>
+                </div>
+            </div>
+        </div>
+        <div className="feature-card" style={{ padding: '1.5rem', backgroundColor: '#ffffff' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{ padding: '0.8rem', backgroundColor: '#e0f2fe', borderRadius: '1rem' }}><CheckCircle size={24} color="#0369a1" /></div>
+                <div>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Total Atendimentos Hoje</span>
+                    <h2 style={{ margin: 0 }}>{stats.totalConsultations} Vidas</h2>
+                </div>
+            </div>
+        </div>
       </div>
 
       <div className="glass-card" style={{ maxWidth: '100%', margin: '0' }}>

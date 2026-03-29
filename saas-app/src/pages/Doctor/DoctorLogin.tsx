@@ -24,7 +24,7 @@ const DoctorLogin = () => {
             navigate('/doctor/dashboard');
         }
     } catch (error: any) {
-        alert(error.response?.data?.error || "Erro ao fazer login no servidor Supabase.");
+        alert(error.response?.data?.error || "Erro ao fazer login no sistema. Credenciais inválidas.");
     } finally {
         setLoading(false);
     }

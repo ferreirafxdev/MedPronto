@@ -48,7 +48,7 @@ const PatientLogin = () => {
         }
       }
     } catch (error: any) {
-      alert(error.response?.data?.error || "Erro. Verifique se o backend está rodando e se as tabelas existem no Supabase.");
+      alert(error.response?.data?.error || "Erro de conexão. Verifique se o sistema está operante.");
     } finally {
       setLoading(false);
     }

@@ -24,8 +24,11 @@ const PatientConsultationRoom = () => {
     setSocket(s);
     s.emit('join_room', roomId);
 
-    s.on('consultation_ended', () => {
-        alert("Sua consulta terminou. Você pode ver seu atestado no Dashboard.");
+    s.on('consultation_ended', (data) => {
+        if(data && data.pdf_url) {
+            window.open(data.pdf_url, '_blank');
+        }
+        alert("Sua consulta terminou. Seu atestado PDF foi baixado em nova janela.");
         navigate('/patient/dashboard');
     });
 
