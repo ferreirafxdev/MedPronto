@@ -18,10 +18,18 @@ const DoctorLogin = () => {
         const login = formData.get('login');
         const password = formData.get('password');
         
-        const resp = await axios.post('http://localhost:3001/api/doctor/auth', { login, password });
+        const resp = await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/doctor/auth`, { login, password });
         if(resp.data.success) {
-            setUser({ id: resp.data.doctor.id, name: resp.data.doctor.name, role: 'doctor' });
+            setUser({ id: resp.data.doctor.id, name: resp.data.doctor.name, role: 'doctor', token: resp.data.token });
             navigate('/doctor/dashboard');
+            return;
+        }
+
+        // Try Admin auth if doctor fails or the endpoint is shared
+        const respAdmin = await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/admin/auth`, { login, password });
+        if(respAdmin.data.success) {
+            setUser({ id: respAdmin.data.admin.id, name: respAdmin.data.admin.name, role: 'admin', token: respAdmin.data.token });
+            navigate('/admin/dashboard');
         }
     } catch (error: any) {
         alert(error.response?.data?.error || "Erro ao fazer login no sistema. Credenciais inválidas.");

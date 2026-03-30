@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useStore } from '../../store/useStore';
 import { useNavigate } from 'react-router-dom';
 import { DollarSign, Users, Database, FileText, TrendingUp, ArrowUpDown, Trash2, Search, ExternalLink } from 'lucide-react';
-import axios from 'axios';
+import apiClient from '../../api/client';
 import { io } from 'socket.io-client';
 
 const AdminDashboard = () => {
@@ -21,13 +21,13 @@ const AdminDashboard = () => {
 
     useEffect(() => {
         if (!user || user.role !== 'admin') {
-            navigate('/admin/login');
+            navigate('/doctor/login'); // Or admin login
             return;
         }
 
         loadData();
 
-        const socket = io('http://localhost:3001');
+        const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:3001');
         socket.on('queue_updated', fetchQueue);
         return () => { socket.disconnect(); };
     }, [user, navigate]);
@@ -46,35 +46,35 @@ const AdminDashboard = () => {
 
     const fetchStats = async () => {
         try {
-            const resp = await axios.get('http://localhost:3001/api/admin/stats');
+            const resp = await apiClient.get('/api/admin/stats');
             if (resp.data.success) setStats(resp.data.stats);
         } catch (e) { console.error(e); }
     };
 
     const fetchQueue = async () => {
         try {
-            const resp = await axios.get('http://localhost:3001/api/queue');
+            const resp = await apiClient.get('/api/queue');
             if (resp.data.success) setQueue(resp.data.queue);
         } catch (e) { console.error(e); }
     };
 
     const fetchDoctors = async () => {
         try {
-            const resp = await axios.get('http://localhost:3001/api/admin/doctors');
+            const resp = await apiClient.get('/api/admin/doctors');
             if (resp.data.success) setDoctors(resp.data.doctors);
         } catch (e) { console.error(e); }
     };
 
     const fetchPatients = async () => {
         try {
-            const resp = await axios.get('http://localhost:3001/api/admin/patients');
+            const resp = await apiClient.get('/api/admin/patients');
             if (resp.data.success) setPatients(resp.data.patients);
         } catch (e) { console.error(e); }
     };
 
     const fetchConsultations = async () => {
         try {
-            const resp = await axios.get('http://localhost:3001/api/admin/consultations');
+            const resp = await apiClient.get('/api/admin/consultations');
             if (resp.data.success) setConsultations(resp.data.consultations);
         } catch (e) { console.error(e); }
     };
@@ -88,7 +88,7 @@ const AdminDashboard = () => {
         newQueue[newIndex] = temp;
         try {
             const stringOrder = newQueue.map(q => JSON.stringify(q));
-            await axios.post('http://localhost:3001/api/admin/reorder-queue', { newOrder: stringOrder });
+            await apiClient.post('/api/admin/reorder-queue', { newOrder: stringOrder });
         } catch (e) { alert("Erro ao reordenar"); }
     };
 
@@ -96,7 +96,7 @@ const AdminDashboard = () => {
         <div className="dashboard-container">
             <header style={{ marginBottom: '2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                 <div>
-                    <h2 style={{ fontSize: '2.4rem', fontWeight: 800 }}>Admin<span className="text-gradient">Console</span></h2>
+                    <h2 style={{ fontSize: '2.4rem', fontWeight: 800 }}>Admin Console</h2>
                     <p style={{ color: 'var(--text-secondary)' }}>Operação Real Time • Banco Supabase • Fila Redis</p>
                 </div>
                 <button className="btn btn-secondary btn-sm" onClick={loadData} disabled={loading}>
@@ -225,7 +225,7 @@ const AdminDashboard = () => {
                                     const payload = Object.fromEntries(fd);
                                     try {
                                         setLoading(true);
-                                        const res = await axios.post('http://localhost:3001/api/admin/doctors', payload);
+                                        const res = await apiClient.post('/api/admin/doctors', payload);
                                         if(res.data.success) {
                                             alert("Médico cadastrado com sucesso!");
                                             (e.target as HTMLFormElement).reset();

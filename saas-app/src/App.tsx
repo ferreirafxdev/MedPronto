@@ -1,5 +1,4 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import AdminLogin from './pages/Admin/AdminLogin';
 import PatientLogin from './pages/Patient/PatientLogin';
@@ -9,6 +8,7 @@ import DoctorDashboard from './pages/Doctor/DoctorDashboard';
 import ConsultationRoom from './pages/Doctor/ConsultationRoom';
 import PatientConsultationRoom from './pages/Patient/PatientConsultationRoom';
 import HomePage from './pages/HomePage';
+import VerifyAtestado from './pages/VerifyAtestado';
 import Header from './components/Header';
 import './index.css';
 
@@ -34,6 +34,7 @@ function App() {
             <Route path="/doctor/login" element={<DoctorLogin />} />
             <Route path="/doctor/dashboard" element={<DoctorDashboard />} />
             <Route path="/doctor/consultation/:roomId" element={<ConsultationRoom />} />
+            <Route path="/validar" element={<VerifyAtestado />} />
           </Routes>
         </main>
       </div>

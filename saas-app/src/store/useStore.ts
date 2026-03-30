@@ -7,6 +7,7 @@ interface User {
   cpf?: string;
   age?: string;
   email?: string;
+  token?: string;
 }
 
 interface StoreState {

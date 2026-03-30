@@ -1,6 +1,5 @@
-import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Stethoscope, User, CalendarClock, Shield, HeartPulse } from 'lucide-react';
+import { Stethoscope, User, CalendarClock, FileText, HeartPulse } from 'lucide-react';
 
 const HomePage = () => {
   const navigate = useNavigate();
@@ -58,12 +57,12 @@ const HomePage = () => {
             <h3>Consultas Integradas</h3>
             <p>Videochamada premium com o médico e acesso a abas de exames, tudo em um único lugar seguro.</p>
           </div>
-          <div className="feature-card">
-            <div className="icon-wrapper bg-slate-100 text-slate-700">
-              <Shield size={32} />
+          <div className="feature-card" onClick={() => navigate('/validar')} style={{ cursor: 'pointer' }}>
+            <div className="icon-wrapper" style={{ background: 'rgba(56, 189, 248, 0.1)', color: 'var(--primary-color)' }}>
+              <FileText size={32} />
             </div>
-            <h3>Dados Blindados</h3>
-            <p>Sua saúde em segredo. Receitas e PDFs da consulta salvos automaticamente em banco de dados encriptado.</p>
+            <h3>Validação de Documentos</h3>
+            <p>Empresas podem validar a autenticidade de atestados emitidos pela MedPronto em segundos.</p>
           </div>
         </div>
       </section>

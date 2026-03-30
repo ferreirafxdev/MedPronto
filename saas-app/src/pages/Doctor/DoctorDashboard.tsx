@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../../store/useStore';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import apiClient from '../../api/client';
 import { Users, FileUser, PlayCircle, DollarSign, CheckCircle } from 'lucide-react';
 
 interface QueuedPatient {
@@ -28,8 +28,8 @@ const DoctorDashboard = () => {
     const fetchData = async () => {
       try {
         const [qResp, sResp] = await Promise.all([
-            axios.get('http://localhost:3001/api/queue'),
-            axios.get(`http://localhost:3001/api/doctor/stats/${user.id}`)
+            apiClient.get('/api/queue'),
+            apiClient.get(`/api/doctor/stats/${user.id}`)
         ]);
         
         if (qResp.data.success) setQueue(qResp.data.queue);
@@ -47,7 +47,7 @@ const DoctorDashboard = () => {
   const takePatient = async () => {
     try {
       setLoading(true);
-      const resp = await axios.post('http://localhost:3001/api/take-patient', { doctorId: user?.id });
+      const resp = await apiClient.post('/api/take-patient', { doctorId: user?.id });
       if (resp.data.success) {
         const { patient } = resp.data;
         setConsultationRoomId(patient.id);
