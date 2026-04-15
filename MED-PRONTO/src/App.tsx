@@ -7,6 +7,7 @@ import DoctorLogin from './pages/Doctor/DoctorLogin';
 import DoctorDashboard from './pages/Doctor/DoctorDashboard';
 import ConsultationRoom from './pages/Doctor/ConsultationRoom';
 import PatientConsultationRoom from './pages/Patient/PatientConsultationRoom';
+import PatientProfile from './pages/Patient/PatientProfile';
 import HomePage from './pages/HomePage';
 import VerifyAtestado from './pages/VerifyAtestado';
 import Header from './components/Header';
@@ -29,6 +30,7 @@ function App() {
             <Route path="/patient/login" element={<PatientLogin />} />
             <Route path="/patient/dashboard" element={<PatientDashboard />} />
             <Route path="/patient/consultation/:roomId" element={<PatientConsultationRoom />} />
+            <Route path="/patient/profile" element={<PatientProfile />} />
 
             {/* Doctor Routes */}
             <Route path="/doctor/login" element={<DoctorLogin />} />

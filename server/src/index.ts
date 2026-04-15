@@ -701,6 +701,48 @@ app.get('/api/validate-atestado/:code', async (req, res) => {
   }
 });
 
+// 9. Patient Profile - Full History
+app.get('/api/patient/history/:cpf', async (req, res) => {
+  try {
+    const { cpf } = req.params;
+    
+    // Get patient
+    const patientResults = await sql`SELECT * FROM patients WHERE cpf = ${cpf} LIMIT 1`;
+    const patient = patientResults[0];
+    if (!patient) return res.status(404).json({ error: 'Paciente não encontrado.' });
+
+    // Get consultations with doctor info
+    const consultations = await sql`
+        SELECT c.*, d.name as doctor_name, d.crm as doctor_crm 
+        FROM consultations c
+        LEFT JOIN doctors d ON c.doctor_id = d.id
+        WHERE c.patient_id = ${patient.id}
+        ORDER BY c.created_at DESC
+    `;
+
+    // Get atestados
+    const atestados = await sql`
+        SELECT * FROM atestados 
+        WHERE patient_id = ${patient.id}
+        ORDER BY created_at DESC
+    `;
+
+    res.json({ 
+      success: true, 
+      patient,
+      consultations,
+      atestados,
+      summary: {
+        totalConsultations: consultations.length,
+        totalAtestados: atestados.length,
+        lastVisit: consultations.length > 0 ? consultations[0].created_at : null,
+      }
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // -- Socket.io Signaling & Chat --
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
