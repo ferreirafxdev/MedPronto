@@ -7,9 +7,21 @@ services:
     buildCommand: npm install && npx tsc
     startCommand: node dist/index.js
     envVars:
-      - key: SUPABASE_URL
-        sync: false
-      - key: SUPABASE_KEY
-        sync: false
+      - key: PORT
+        [cite_start]value: 3001 [cite: 1]
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        [cite_start]sync: false # Valor: postgresql://neondb_owner:npg_2DlVwreMQ8hz@ep-holy-wind-amxnwau1-pooler.c-5.us-east-1.aws.neon.tech/MedPronto?sslmode=require&channel_binding=require 
       - key: REDIS_URL
-        sync: false
+        [cite_start]sync: false # Valor: rediss://default:gQAAAAAAAYS8AAIncDE4NGM2ODAzNzMyNjE0MDEwYTAxOTNjZmM1YzkzZTQ1ZXAxOTk1MTY@suitable-gnat-99516.upstash.io:6379 
+      - key: SUPABASE_URL
+        [cite_start]value: https://xpbyihsyblghajbcvudb.supabase.co [cite: 1]
+      - key: SUPABASE_KEY
+        [cite_start]value: sb_publishable_BfbauKS8W_eXJre-AW3Y-w_6JTiMyrW [cite: 1]
+      - key: JWT_SECRET
+        [cite_start]value: medpronto-secret-key-2026 [cite: 1]
+      - key: ADMIN_PASSWORD
+        [cite_start]value: admin123 [cite: 1]
+      - key: CORS_ORIGIN
+        value: https://med-pronto-wph4.vercel.app
