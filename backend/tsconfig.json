@@ -7,7 +7,11 @@
     "strict": true,
     "skipLibCheck": true,
     "outDir": "./dist",
+<<<<<<< HEAD
     "rootDir": "./src"
+=======
+    "rootDir": "./src"  // <--- Adicione isso para garantir a estrutura
+>>>>>>> 9685e1e77da851ec067cba62b1ecdb78f3ce3469
   },
   "include": ["src/**/*"]
 }
