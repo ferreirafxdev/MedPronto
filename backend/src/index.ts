@@ -39,6 +39,12 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// Middleware de log de erros global
+app.use((err: any, req: any, res: any, next: any) => {
+    console.error('🔥 Erro Global Detectado:', err);
+    res.status(500).json({ error: 'Erro interno no servidor.', details: err.message });
+});
+
 // Endpoint de saúde
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });

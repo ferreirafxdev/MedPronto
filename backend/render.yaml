@@ -8,20 +8,20 @@ services:
     startCommand: node dist/index.js
     envVars:
       - key: PORT
-        [cite_start]value: 3001 [cite: 1]
+        value: 3001
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        [cite_start]sync: false # Valor: postgresql://neondb_owner:npg_2DlVwreMQ8hz@ep-holy-wind-amxnwau1-pooler.c-5.us-east-1.aws.neon.tech/MedPronto?sslmode=require&channel_binding=require 
+        sync: false
       - key: REDIS_URL
-        [cite_start]sync: false # Valor: rediss://default:AZ2YAAIncDE1MGVlODFlOThhN2Y0ODNiOWYyYzFhNjViYWFhNDczNnAxNDAzNDQ@finer-primate-40344.upstash.io:6379
+        sync: false
       - key: SUPABASE_URL
-        [cite_start]value: https://xpbyihsyblghajbcvudb.supabase.co [cite: 1]
+        value: https://wrltuhhfqaqlrgoiafph.supabase.co
       - key: SUPABASE_KEY
-        [cite_start]value: sb_publishable_BfbauKS8W_eXJre-AW3Y-w_6JTiMyrW [cite: 1]
+        value: sb_publishable_KLL387pq4FBIC84iuMtx5g_f_y531_d
       - key: JWT_SECRET
-        [cite_start]value: medpronto-secret-key-2026 [cite: 1]
+        value: medpronto-secret-key-2026
       - key: ADMIN_PASSWORD
-        [cite_start]value: admin123 [cite: 1]
+        value: admin123
       - key: CORS_ORIGIN
         value: https://med-pronto-wph4.vercel.app
