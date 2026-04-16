@@ -14,7 +14,7 @@ services:
       - key: DATABASE_URL
         [cite_start]sync: false # Valor: postgresql://neondb_owner:npg_2DlVwreMQ8hz@ep-holy-wind-amxnwau1-pooler.c-5.us-east-1.aws.neon.tech/MedPronto?sslmode=require&channel_binding=require 
       - key: REDIS_URL
-        [cite_start]sync: false # Valor: rediss://default:gQAAAAAAAYS8AAIncDE4NGM2ODAzNzMyNjE0MDEwYTAxOTNjZmM1YzkzZTQ1ZXAxOTk1MTY@suitable-gnat-99516.upstash.io:6379 
+        [cite_start]sync: false # Valor: rediss://default:AZ2YAAIncDE1MGVlODFlOThhN2Y0ODNiOWYyYzFhNjViYWFhNDczNnAxNDAzNDQ@finer-primate-40344.upstash.io:6379
       - key: SUPABASE_URL
         [cite_start]value: https://xpbyihsyblghajbcvudb.supabase.co [cite: 1]
       - key: SUPABASE_KEY
