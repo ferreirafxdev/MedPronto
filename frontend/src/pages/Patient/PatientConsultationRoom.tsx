@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
-import { io, Socket } from 'socket.io-client';
+import { io } from 'socket.io-client';
 import { JitsiMeeting } from '@jitsi/react-sdk';
 
 const PatientConsultationRoom = () => {
@@ -10,12 +10,10 @@ const PatientConsultationRoom = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const docId = new URLSearchParams(location.search).get('doc');
-  const [socket, setSocket] = useState<Socket | null>(null);
 
   useEffect(() => {
     if(!user || !docId) { navigate('/patient/login'); return; }
     const s = io(import.meta.env.VITE_API_URL || 'http://localhost:3001');
-    setSocket(s);
     s.emit('join_room', roomId);
     s.on('consultation_ended', (data) => { if(data?.pdf_url) window.open(data.pdf_url, '_blank'); alert("Sua consulta terminou."); navigate('/patient/dashboard'); });
     return () => { s.disconnect(); };
@@ -33,7 +31,7 @@ const PatientConsultationRoom = () => {
           <JitsiMeeting domain="meet.jit.si" roomName={roomName}
               configOverwrite={{ startWithAudioMuted: false, startWithVideoMuted: false, prejoinPageEnabled: false, disableDeepLinking: true }}
               interfaceConfigOverwrite={{ DISABLE_JOIN_LEAVE_NOTIFICATIONS: true, SHOW_JITSI_WATERMARK: false, SHOW_WATERMARK_FOR_GUESTS: false, TOOLBAR_BUTTONS: ['microphone', 'camera', 'chat', 'hangup', 'fullscreen'] }}
-              userInfo={{ displayName: user?.name || 'Paciente' }}
+              userInfo={{ displayName: user?.name || 'Paciente', email: user?.email || 'paciente@medpronto.com' }}
               getIFrameRef={(iframeRef: any) => { iframeRef.style.height = '100%'; iframeRef.style.width = '100%'; iframeRef.style.border = 'none'; }}
           />
       </div>

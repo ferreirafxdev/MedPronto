@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Stethoscope, User, CalendarClock, FileText, HeartPulse, ArrowRight, Sparkles, Shield } from 'lucide-react';
+import { Stethoscope, User, CalendarClock, HeartPulse, ArrowRight, Sparkles, Shield } from 'lucide-react';
 
 const HomePage = () => {
   const navigate = useNavigate();

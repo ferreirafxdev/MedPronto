@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from '../../store/useStore';
 import { useNavigate } from 'react-router-dom';
-import { DollarSign, Users, Database, FileText, TrendingUp, ArrowUpDown, ExternalLink, RefreshCw, BarChart3 } from 'lucide-react';
+import { Users, Database, TrendingUp, ArrowUpDown, ExternalLink, RefreshCw, BarChart3, FileText } from 'lucide-react';
 import apiClient from '../../api/client';
 import { io } from 'socket.io-client';
 

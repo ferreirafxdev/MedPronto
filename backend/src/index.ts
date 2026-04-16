@@ -15,12 +15,12 @@ import sql from './db';
 dotenv.config();
 
 const app = express();
-app.use(cors({ origin: ['http://localhost:5173', 'http://127.0.0.1:5173'] }));
+app.use(cors({ origin: ['http://localhost:5173', 'http://127.0.0.1:5173', 'https://med-pronto-wph4.vercel.app'] }));
 app.use(express.json());
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
-  cors: { origin: ['http://localhost:5173', 'http://127.0.0.1:5173'] }
+  cors: { origin: ['http://localhost:5173', 'http://127.0.0.1:5173', 'https://med-pronto-wph4.vercel.app'] }
 });
 
 // -- ENV Variables --

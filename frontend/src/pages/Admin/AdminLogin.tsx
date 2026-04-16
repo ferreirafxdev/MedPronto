@@ -15,7 +15,8 @@ const AdminLogin = () => {
     e.preventDefault();
     setLoading(true);
     try {
-        const resp = await axios.post('http://localhost:3001/api/admin/auth', { login, password });
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+        const resp = await axios.post(`${apiUrl}/api/admin/auth`, { login, password });
         if(resp.data.success) { setUser(resp.data.admin); navigate('/admin/dashboard'); }
     } catch (error: any) {
         alert(error.response?.data?.error || "Acesso administrativo negado.");

@@ -1,13 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from '../../store/useStore';
 import { useNavigate } from 'react-router-dom';
-import { Clock, Activity, FileText, Video, Wifi } from 'lucide-react';
-import { io, Socket } from 'socket.io-client';
+import { Clock, Activity, FileText, Video, Wifi, Loader2 } from 'lucide-react';
+import { io } from 'socket.io-client';
+import axios from 'axios';
 
 const PatientDashboard = () => {
   const { user, setConsultationRoomId } = useStore();
   const navigate = useNavigate();
-  const [socket, setSocket] = useState<Socket | null>(null);
   const [inQueue, setInQueue] = useState(false);
   const [consultationReady, setConsultationReady] = useState(false);
   const [roomData, setRoomData] = useState<{roomId: string, doctorId: string} | null>(null);
@@ -37,7 +37,6 @@ const PatientDashboard = () => {
     checkStatus();
 
     const s = io(apiUrl);
-    setSocket(s);
     s.emit('join_room', user.id);
     
     s.on('consultation_started', (data) => { 

@@ -3,9 +3,9 @@ import { useStore } from '../../store/useStore';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import {
-  User, Calendar, FileText, Stethoscope, Clock,
-  Download, ExternalLink, ClipboardList, PenTool,
-  Heart, Shield, ArrowLeft, Loader2, Mail, Hash
+  User, Calendar, Stethoscope, Clock,
+  Download, ClipboardList, PenTool,
+  Shield, ArrowLeft, Loader2, Mail, Hash
 } from 'lucide-react';
 
 interface Consultation {
@@ -374,7 +374,9 @@ const ConsultationCard = ({ consultation, expanded }: { consultation: Consultati
 
 const EmptyState = ({ icon, text }: { icon: React.ReactNode; text: string }) => (
   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '3rem 0', color: 'var(--text-muted)' }}>
-    <div style={{ opacity: 0.25, marginBottom: '0.6rem' }}>{React.cloneElement(icon as React.ReactElement, { size: 48 })}</div>
+    <div style={{ opacity: 0.25, marginBottom: '0.6rem' }}>
+        {React.isValidElement(icon) ? React.cloneElement(icon as React.ReactElement<any>, { size: 48 }) : icon}
+    </div>
     <p style={{ fontSize: '0.9rem', margin: 0 }}>{text}</p>
   </div>
 );
