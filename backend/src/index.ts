@@ -14,6 +14,7 @@ import sql from './db';
 
 dotenv.config();
 
+const app = express();
 const allowedOrigins = [
   'http://localhost:5173', 
   'http://127.0.0.1:5173', 
@@ -44,13 +45,11 @@ app.get('/api/health', (req, res) => {
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
-const io = new Server(httpServer, {
   cors: {
     origin: allowedOrigins as any,
     methods: ['GET', 'POST'],
     credentials: true
   }
-});
 });
 
 // -- ENV Variables --
