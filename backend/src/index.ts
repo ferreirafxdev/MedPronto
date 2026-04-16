@@ -15,12 +15,23 @@ import sql from './db';
 dotenv.config();
 
 const app = express();
-app.use(cors({ origin: ['http://localhost:5173', 'http://127.0.0.1:5173', 'https://med-pronto-wph4.vercel.app'] }));
+const allowedOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173', 'https://med-pronto-wph4.vercel.app'];
+
+app.use(cors({
+  origin: allowedOrigins,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+  credentials: true
+}));
 app.use(express.json());
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
-  cors: { origin: ['http://localhost:5173', 'http://127.0.0.1:5173', 'https://med-pronto-wph4.vercel.app'] }
+  cors: {
+    origin: allowedOrigins,
+    methods: ['GET', 'POST'],
+    credentials: true
+  }
 });
 
 // -- ENV Variables --
@@ -31,7 +42,22 @@ const JWT_SECRET = process.env.JWT_SECRET || 'medpronto-secret-key-2026';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
 // Instances
-const redis = new Redis(REDIS_URL, { tls: { rejectUnauthorized: false } });
+const redis = new Redis(REDIS_URL, { 
+    tls: { rejectUnauthorized: false },
+    maxRetriesPerRequest: 3,
+    retryStrategy(times) {
+        const delay = Math.min(times * 100, 3000);
+        return delay;
+    }
+});
+
+redis.on('error', (err) => {
+    console.error('❌ Redis Connection Error:', err.message);
+});
+
+redis.on('connect', () => {
+    console.log('✅ Connected to Redis');
+});
 
 let supabase: any = null;
 if (SUPABASE_URL && SUPABASE_KEY) {
