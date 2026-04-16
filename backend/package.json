@@ -4,11 +4,19 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+<<<<<<< HEAD
     "dev": "ts-node-dev src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+=======
+  "dev": "ts-node-dev src/index.ts",
+  "build": "tsc",
+  "start": "node dist/index.js",
+  "test": "echo \"Error: no test specified\" && exit 1"
+},
+>>>>>>> 9685e1e77da851ec067cba62b1ecdb78f3ce3469
   "keywords": [],
   "author": "",
   "license": "ISC",
