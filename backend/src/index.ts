@@ -19,7 +19,8 @@ const allowedOrigins = [
   'http://localhost:5173', 
   'http://127.0.0.1:5173', 
   'https://med-pronto-wph4.vercel.app',
-  /\.vercel\.app$/ // Permite subdomínios da Vercel
+  'https://medpronto-online.vercel.app', 
+  /\.vercel\.app$/ 
 ];
 
 app.use(cors({
@@ -319,7 +320,7 @@ app.post('/api/enqueue', async (req, res) => {
 app.get('/api/queue', async (req, res) => {
   try {
     const queueData = await redis.lrange('patient_queue', 0, -1);
-    const parsedQueue = queueData.map(q => JSON.parse(q));
+    const parsedQueue = queueData.map((q: string) => JSON.parse(q));
     res.json({ success: true, queue: parsedQueue });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -330,7 +331,7 @@ app.get('/api/patient/check-queue/:patientId', async (req, res) => {
     try {
         const { patientId } = req.params;
         const queueData = await redis.lrange('patient_queue', 0, -1);
-        const inQueue = queueData.some(q => JSON.parse(q).id === patientId);
+        const inQueue = queueData.some((q: string) => JSON.parse(q).id === patientId);
         
         // Also check if in active consultation
         const activeConsultation = await redis.get(`consultation:${patientId}`);

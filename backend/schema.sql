@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS patients (
     cpf TEXT UNIQUE NOT NULL,
     age TEXT,
     email TEXT,
+    birth_date TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -23,13 +23,13 @@ O sistema é dividido em duas partes principais:
 
 ## Estrutura de Diretórios
 
-- `/saas-app`: Contém o código client-side (Frontend).
+- `/frontend`: Contém o código client-side (Frontend).
   - `/src/pages/Admin`: Dashboard administrativo, finanças e cadastro médico.
   - `/src/pages/Patient`: Fluxo do paciente, desde cadastro na fila (queixa principal) até sala de vídeo e histórico.
   - `/src/pages/Doctor`: Fluxo do médico, desde login, assumir fila até tela de prontuário com abas (Evolução, Exames, Receita, Chat e Vídeo).
   - `/src/store`: Contexto global.
 
-- `/server`: Contém o código server-side (Backend).
+- `/backend`: Contém o código server-side (Backend).
   - `index.ts`: Arquivo central contendo a API REST, manipulação Redis, geração de PDF, integração S3 no Supabase e Socket.io.
 
 ## Fluxo de Fila (Redis e UI)
@@ -51,7 +51,7 @@ Abra dois terminais (PowerShell/CMD).
 
 **Terminal 1 (Backend - Fila, Socket, PDF, Supabase):**
 ```bash
-cd server
+cd backend
 npm install
 npx ts-node-dev src/index.ts
 ```
@@ -59,7 +59,7 @@ npx ts-node-dev src/index.ts
 
 **Terminal 2 (Frontend - Interface Visual):**
 ```bash
-cd saas-app
+cd frontend
 npm install
 npm run dev
 ```
