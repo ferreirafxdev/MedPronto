@@ -1,66 +1,40 @@
 import { Client } from 'pg';
+import fs from 'fs';
+import path from 'path';
+import dotenv from 'dotenv';
 
-const connectionString = 'postgresql://postgres:postgresadmin@db.xpbyihsyblghajbcvudb.supabase.co:5432/postgres';
+dotenv.config();
 
-const createTables = async () => {
-  const client = new Client({ connectionString });
-  try {
-    await client.connect();
-    console.log('🔗 Conectado ao PostgreSQL (Supabase) com sucesso!');
+const DATABASE_URL = process.env.DATABASE_URL || '';
 
-    // Tabela PATIENTS
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS public.patients (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        name TEXT NOT NULL,
-        cpf TEXT UNIQUE NOT NULL,
-        age TEXT,
-        email TEXT,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-      );
-    `);
-    console.log('✅ Tabela "patients" pronta.');
+async function migrate() {
+    if (!DATABASE_URL) {
+        console.error('❌ DATABASE_URL não encontrada no .env');
+        process.exit(1);
+    }
 
-    // Tabela DOCTORS
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS public.doctors (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        name TEXT NOT NULL,
-        crm TEXT UNIQUE NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-      );
-    `);
-    console.log('✅ Tabela "doctors" pronta.');
+    const client = new Client({
+        connectionString: DATABASE_URL,
+        ssl: { rejectUnauthorized: false }
+    });
 
-    // Inserindo Doutor Inicial para teste (senha '1234')
-    await client.query(`
-      INSERT INTO public.doctors (name, crm, email, password)
-      VALUES ('Dr. Administrador', '123456', 'doctor@admin.com', '1234')
-      ON CONFLICT (crm) DO NOTHING;
-    `);
-    console.log('👨‍⚕️ Médico de teste garantido no BD.');
+    try {
+        console.log('🚀 Iniciando migração do banco de dados Neon via PG Client...');
+        await client.connect();
+        
+        const schemaPath = path.join(__dirname, '../schema.sql');
+        const schema = fs.readFileSync(schemaPath, 'utf8');
 
-    // Tabela CONSULTATIONS (Armazena histórico e URL PDFs do S3)
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS public.consultations (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        patient_id UUID REFERENCES public.patients(id),
-        patient_cpf TEXT,
-        doctor_id UUID REFERENCES public.doctors(id),
-        notes TEXT,
-        pdf_path TEXT,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-      );
-    `);
-    console.log('✅ Tabela "consultations" pronta.');
+        // Execute as a single block to handle multi-line commands correctly
+        await client.query(schema);
 
-  } catch (err) {
-    console.error('❌ Erro de Migração:', err);
-  } finally {
-    await client.end();
-  }
-};
+        console.log('✅ Migração concluída com sucesso! Todas as tabelas foram criadas.');
+    } catch (err: any) {
+        console.error('❌ Erro durante a migração:', err.message);
+        process.exit(1);
+    } finally {
+        await client.end();
+    }
+}
 
-createTables();
+migrate();
