@@ -50,6 +50,9 @@ const Header = () => {
               {user.role === 'patient' && (
                 <NavLink to="/patient/profile" active={isActive('/patient/profile')} icon={<User size={15} />} label="Meu Perfil" />
               )}
+              {user.role === 'doctor' && (
+                <NavLink to="/doctor/dashboard" active={isActive('/doctor/dashboard')} icon={<Activity size={15} />} label="Minha Fila" />
+              )}
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-heading)' }}>{user.name}</div>
                 <div style={{ fontSize: '0.62rem', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>{user.role}</div>

@@ -1,8 +1,10 @@
 import { useNavigate } from 'react-router-dom';
-import { Stethoscope, User, CalendarClock, HeartPulse, ArrowRight, Sparkles, Shield } from 'lucide-react';
+import { Stethoscope, User, CalendarClock, HeartPulse, ArrowRight, Sparkles, Shield, Activity } from 'lucide-react';
+import { useStore } from '../store/useStore';
 
 const HomePage = () => {
   const navigate = useNavigate();
+  const { user } = useStore();
 
   return (
     <div className="homepage">
@@ -18,12 +20,24 @@ const HomePage = () => {
             Acesse médicos qualificados em minutos por videochamada com receita e atestado na mesma hora.
           </p>
           <div className="hero-buttons">
-            <button className="btn btn-primary btn-lg" onClick={() => navigate('/patient/login')}>
-              <User size={17} /> Nova Consulta <ArrowRight size={15} />
-            </button>
-            <button className="btn btn-outline btn-lg" onClick={() => navigate('/doctor/login')}>
-              <Stethoscope size={17} /> Sou Médico
-            </button>
+            {user?.role === 'doctor' ? (
+              <button className="btn btn-primary btn-lg" onClick={() => navigate('/doctor/dashboard')}>
+                <Activity size={17} /> Minha Fila (Dashboard) <ArrowRight size={15} />
+              </button>
+            ) : user?.role === 'patient' ? (
+              <button className="btn btn-primary btn-lg" onClick={() => navigate('/patient/dashboard')}>
+                <Activity size={17} /> Meu Atendimento <ArrowRight size={15} />
+              </button>
+            ) : (
+              <>
+                <button className="btn btn-primary btn-lg" onClick={() => navigate('/patient/login')}>
+                  <User size={17} /> Nova Consulta <ArrowRight size={15} />
+                </button>
+                <button className="btn btn-outline btn-lg" onClick={() => navigate('/doctor/login')}>
+                  <Stethoscope size={17} /> Sou Médico
+                </button>
+              </>
+            )}
           </div>
         </div>
         <div className="hero-image-wrapper">
