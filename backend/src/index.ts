@@ -14,25 +14,33 @@ import sql from './db';
 
 dotenv.config();
 
-const app = express();
-const allowedOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173', 'https://med-pronto-wph4.vercel.app'];
+const allowedOrigins = [
+  'http://localhost:5173', 
+  'http://127.0.0.1:5173', 
+  'https://med-pronto-wph4.vercel.app',
+  /\.vercel\.app$/ // Isso permite QUALQUER subdomínio da vercel (muito útil)
+];
 
 app.use(cors({
-  origin: allowedOrigins,
+  origin: (origin, callback) => {
+    // Permite requisições sem origin (como mobile apps ou curl)
+    if (!origin) return callback(null, true);
+    
+    const isAllowed = allowedOrigins.some(allowed => {
+      if (allowed instanceof RegExp) return allowed.test(origin);
+      return allowed === origin;
+    });
+
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
   credentials: true
 }));
-app.use(express.json());
-
-const httpServer = createServer(app);
-const io = new Server(httpServer, {
-  cors: {
-    origin: allowedOrigins,
-    methods: ['GET', 'POST'],
-    credentials: true
-  }
-});
 
 // -- ENV Variables --
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
