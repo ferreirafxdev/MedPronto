@@ -1,6 +1,7 @@
 services:
   - type: web
     name: medpronto-backend
+    rootDir: backend
     env: node
     plan: free
     buildDir: .
