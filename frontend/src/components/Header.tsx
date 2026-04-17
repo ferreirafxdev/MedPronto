@@ -1,40 +1,46 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useStore } from '../store/useStore';
-import { LogOut, User, Activity, ShieldCheck, Home, Heart } from 'lucide-react';
+import { LogOut, User, Activity, ShieldCheck, Home, Heart, Menu, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 const Header = () => {
   const { user, setUser } = useStore();
   const navigate = useNavigate();
   const location = useLocation();
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const handleLogout = () => {
     setUser(null);
     navigate('/');
+    setMobileMenuOpen(false);
   };
 
   const isActive = (path: string) => location.pathname.startsWith(path);
 
   return (
-    <header className="header">
-      <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-
-        <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', textDecoration: 'none' }}>
-          <div style={{
-            width: '34px', height: '34px',
-            background: 'linear-gradient(135deg, var(--accent), var(--mint))',
-            borderRadius: 'var(--radius-sm)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 2px 8px rgba(37,99,235,0.2)',
-          }}>
+    <header className={`header ${isScrolled ? 'header-scrolled' : ''}`}>
+      <div className="header-container">
+        <Link to="/" className="logo-link" onClick={() => setMobileMenuOpen(false)}>
+          <div className="logo-icon">
             <Heart size={18} color="white" fill="white" strokeWidth={0} />
           </div>
-          <span className="logo">
-            <span style={{ color: 'var(--accent)' }}>Med</span>
-            <span style={{ color: 'var(--text-heading)' }}>Pronto</span>
+          <span className="logo-text">
+            <span className="med">Med</span>
+            <span className="pronto">Pronto</span>
           </span>
         </Link>
 
-        <nav style={{ display: 'flex', alignItems: 'center', gap: '0.15rem' }}>
+        {/* Desktop Nav */}
+        <nav className="desktop-nav">
           <NavLink to="/" active={location.pathname === '/'} icon={<Home size={15} />} label="Início" />
 
           {!user && (
@@ -46,49 +52,74 @@ const Header = () => {
           )}
 
           {user && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', marginLeft: '0.5rem', paddingLeft: '0.85rem', borderLeft: '1px solid var(--border)' }}>
+            <div className="user-section">
               {user.role === 'patient' && (
                 <NavLink to="/patient/profile" active={isActive('/patient/profile')} icon={<User size={15} />} label="Meu Perfil" />
               )}
               {user.role === 'doctor' && (
                 <NavLink to="/doctor/dashboard" active={isActive('/doctor/dashboard')} icon={<Activity size={15} />} label="Minha Fila" />
               )}
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text-heading)' }}>{user.name}</div>
-                <div style={{ fontSize: '0.62rem', color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>{user.role}</div>
+              <div className="user-info">
+                <div className="user-name">{user.name}</div>
+                <div className="user-role">{user.role}</div>
               </div>
-              <button
-                onClick={handleLogout}
-                className="btn btn-outline btn-sm"
-                style={{ color: 'var(--coral)', borderColor: 'var(--coral-light)', gap: '0.3rem' }}
-              >
+              <button onClick={handleLogout} className="btn-logout">
                 <LogOut size={13} /> Sair
               </button>
             </div>
           )}
         </nav>
+
+        {/* Mobile Toggle */}
+        <button className="mobile-toggle" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+          {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+
+        {/* Mobile Menu */}
+        {mobileMenuOpen && (
+          <div className="mobile-menu">
+            <NavLink to="/" active={location.pathname === '/'} icon={<Home size={18} />} label="Início" onClick={() => setMobileMenuOpen(false)} />
+            {!user && (
+              <>
+                <NavLink to="/patient/login" active={isActive('/patient')} icon={<User size={18} />} label="Pacientes" onClick={() => setMobileMenuOpen(false)} />
+                <NavLink to="/doctor/login" active={isActive('/doctor')} icon={<Activity size={18} />} label="Médicos" onClick={() => setMobileMenuOpen(false)} />
+                <NavLink to="/admin/login" active={isActive('/admin')} icon={<ShieldCheck size={18} />} label="Admin" onClick={() => setMobileMenuOpen(false)} />
+              </>
+            )}
+            {user && (
+              <>
+                {user.role === 'patient' && (
+                  <NavLink to="/patient/profile" active={isActive('/patient/profile')} icon={<User size={18} />} label="Meu Perfil" onClick={() => setMobileMenuOpen(false)} />
+                )}
+                {user.role === 'doctor' && (
+                  <NavLink to="/doctor/dashboard" active={isActive('/doctor/dashboard')} icon={<Activity size={18} />} label="Minha Fila" onClick={() => setMobileMenuOpen(false)} />
+                )}
+                <div className="mobile-user-info">
+                    <strong>{user.name}</strong>
+                    <span>{user.role}</span>
+                </div>
+                <button onClick={handleLogout} className="btn btn-danger btn-full" style={{ marginTop: '1rem' }}>
+                  <LogOut size={16} /> Sair do Sistema
+                </button>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </header>
   );
 };
 
-const NavLink = ({ to, active, icon, label }: { to: string; active: boolean; icon: React.ReactNode; label: string }) => (
+const NavLink = ({ to, active, icon, label, onClick }: { to: string; active: boolean; icon: React.ReactNode; label: string; onClick?: () => void }) => (
   <Link
     to={to}
-    style={{
-      display: 'flex', alignItems: 'center', gap: '0.35rem',
-      padding: '0.42rem 0.75rem',
-      borderRadius: 'var(--radius-sm)',
-      color: active ? 'var(--accent)' : 'var(--text-muted)',
-      fontWeight: active ? 700 : 500,
-      fontSize: '0.84rem',
-      background: active ? 'var(--accent-ultra-light)' : 'transparent',
-      transition: 'all 0.2s var(--ease)',
-      textDecoration: 'none',
-    }}
+    onClick={onClick}
+    className={`nav-link ${active ? 'active' : ''}`}
   >
-    {icon} {label}
+    {icon} <span>{label}</span>
   </Link>
 );
+
+export default Header;
 
 export default Header;

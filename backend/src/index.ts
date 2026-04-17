@@ -11,6 +11,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { streamToBuffer } from './utils'; 
 import sql from './db';
+import { BirdIdService } from './birdid';
 
 dotenv.config();
 
@@ -452,6 +453,14 @@ app.post('/api/end-consultation', authenticateToken, authorizeDoctor, async (req
     const pdfBuffer = await new Promise<Buffer>((resolve) => {
       doc.on('end', () => resolve(Buffer.concat(buffers)));
     });
+
+    // --- Bird ID Digital Signature Step ---
+    const birdIdToken = await BirdIdService.authenticate();
+    if (birdIdToken) {
+        console.log('✅ Autorização Bird ID obtida. Assinando prontuário...');
+        // Simulação de assinatura do documento
+        await BirdIdService.signHash(patientId, birdIdToken);
+    }
 
     if (!supabase) {
         console.warn("Upload de PDF ignorado: Supabase não configurado.");

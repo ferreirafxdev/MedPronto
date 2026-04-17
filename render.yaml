@@ -12,7 +12,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        sync: false
+        value: postgresql://postgres:postgresadmin@db.wrltuhhfqaqlrgoiafph.supabase.co:5432/postgres
       - key: REDIS_URL
         sync: false
       - key: SUPABASE_URL
