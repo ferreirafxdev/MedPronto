@@ -36,6 +36,10 @@ app.use(express.json());
 
 // Logger de requisições
 app.use((req, res, next) => {
+    // Normalizar caminhos com barras duplas (ex: //api -> /api)
+    if (req.path.includes('//')) {
+        req.url = req.url.replace(/\/+/g, '/');
+    }
     console.log(`🌐 [${new Date().toISOString()}] ${req.method} ${req.path}`);
     next();
 });
