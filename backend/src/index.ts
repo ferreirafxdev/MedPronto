@@ -917,7 +917,12 @@ app.post('/api/payment/create-checkout', async (req, res) => {
     console.log("💰 [Stripe] Iniciando checkout session...");
     try {
         const session = await stripe.checkout.sessions.create({
-            payment_method_types: ['card'],
+            payment_method_types: ['card', 'pix'],
+            payment_method_options: {
+                pix: {
+                    expires_at: Math.floor(Date.now() / 1000) + (30 * 60) // 30 minutos para pagar
+                }
+            },
             line_items: [{
                 price_data: {
                     currency: 'brl',
