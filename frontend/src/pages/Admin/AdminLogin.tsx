@@ -1,8 +1,4 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useStore } from '../../store/useStore';
-import { ShieldCheck, Loader2, Lock, Mail } from 'lucide-react';
-import axios from 'axios';
+import apiClient from '../../api/client';
 
 const AdminLogin = () => {
   const [loading, setLoading] = useState(false);
@@ -15,9 +11,11 @@ const AdminLogin = () => {
     e.preventDefault();
     setLoading(true);
     try {
-        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-        const resp = await axios.post(`${apiUrl}/api/admin/auth`, { login, password });
-        if(resp.data.success) { setUser(resp.data.admin); navigate('/admin/dashboard'); }
+        const resp = await apiClient.post('/api/admin/auth', { login, password });
+        if (resp.data.success) {
+            setUser({ ...resp.data.admin, token: resp.data.token });
+            navigate('/admin/dashboard');
+        }
     } catch (error: any) {
         alert(error.response?.data?.error || "Acesso administrativo negado.");
     } finally { setLoading(false); }

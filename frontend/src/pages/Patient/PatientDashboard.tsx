@@ -1,9 +1,4 @@
-import { useEffect, useState } from 'react';
-import { useStore } from '../../store/useStore';
-import { useNavigate } from 'react-router-dom';
-import { Clock, Activity, FileText, Video, Wifi, Loader2 } from 'lucide-react';
-import { io } from 'socket.io-client';
-import axios from 'axios';
+import apiClient from '../../api/client';
 
 const PatientDashboard = () => {
   const { user, setConsultationRoomId } = useStore();
@@ -14,20 +9,14 @@ const PatientDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [complaint, setComplaint] = useState('');
 
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-
   useEffect(() => {
     if (!user) { navigate('/patient/login'); return; }
     
     // Check initial status
     const checkStatus = async () => {
         try {
-            const resp = await axios.get(`${apiUrl}/api/patient/check-queue/${user.id}`);
+            const resp = await apiClient.get(`/api/patient/check-queue/${user.id}`);
             if (resp.data.inQueue) setInQueue(true);
-            if (resp.data.isActive) {
-                // If active, we'll wait for the socket to tell us the room
-                setInQueue(false);
-            }
         } catch (e) {
             console.error("Erro ao verificar status da fila");
         } finally {
@@ -36,7 +25,8 @@ const PatientDashboard = () => {
     };
     checkStatus();
 
-    const s = io(apiUrl);
+    const socketUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+    const s = io(socketUrl);
     s.emit('join_room', user.id);
     
     s.on('consultation_started', (data) => { 
@@ -53,13 +43,13 @@ const PatientDashboard = () => {
     });
 
     return () => { s.disconnect(); };
-  }, [user, navigate, apiUrl]);
+  }, [user, navigate]);
 
   const handleEnqueue = async () => {
     if (!complaint.trim()) return alert("Por favor, descreva o que está sentindo.");
     setLoading(true);
     try {
-        const resp = await axios.post(`${apiUrl}/api/enqueue`, {
+        const resp = await apiClient.post('/api/enqueue', {
             ...user,
             complaint
         });

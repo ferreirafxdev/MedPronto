@@ -1,8 +1,4 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useStore } from '../../store/useStore';
-import { Loader2, Stethoscope, Lock, User as UserIcon } from 'lucide-react';
-import axios from 'axios';
+import apiClient from '../../api/client';
 
 const DoctorLogin = () => {
   const [loading, setLoading] = useState(false);
@@ -16,10 +12,24 @@ const DoctorLogin = () => {
         const formData = new FormData(e.target as HTMLFormElement);
         const login = formData.get('login');
         const password = formData.get('password');
-        const resp = await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/doctor/auth`, { login, password });
-        if(resp.data.success) { setUser({ id: resp.data.doctor.id, name: resp.data.doctor.name, role: 'doctor', token: resp.data.token }); navigate('/doctor/dashboard'); return; }
-        const respAdmin = await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/admin/auth`, { login, password });
-        if(respAdmin.data.success) { setUser({ id: respAdmin.data.admin.id, name: respAdmin.data.admin.name, role: 'admin', token: respAdmin.data.token }); navigate('/admin/dashboard'); }
+        
+        // Try Doctor Login
+        try {
+            const resp = await apiClient.post('/api/doctor/auth', { login, password });
+            if (resp.data.success) {
+                setUser({ id: resp.data.doctor.id, name: resp.data.doctor.name, role: 'doctor', token: resp.data.token });
+                navigate('/doctor/dashboard');
+                return;
+            }
+        } catch (doctorErr) {
+            // If doctor login fails, try Admin Login
+            const respAdmin = await apiClient.post('/api/admin/auth', { login, password });
+            if (respAdmin.data.success) {
+                setUser({ id: respAdmin.data.admin.id, name: respAdmin.data.admin.name, role: 'admin', token: respAdmin.data.token });
+                navigate('/admin/dashboard');
+                return;
+            }
+        }
     } catch (error: any) {
         alert(error.response?.data?.error || "Erro ao fazer login no sistema. Credenciais inválidas.");
     } finally { setLoading(false); }

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { Loader2, HeartPulse } from 'lucide-react';
-import axios from 'axios';
+import apiClient from '../../api/client';
 
 const PatientLogin = () => {
   const [isLogin, setIsLogin] = useState(false);
@@ -26,9 +26,8 @@ const PatientLogin = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
       if (isLogin) {
-        const loginResp = await axios.post(`${apiUrl}/api/patient/auth`, { 
+        const loginResp = await apiClient.post('/api/patient/auth', { 
           cpf: formData.cpf, 
           birthDate: formData.birthDate 
         });
@@ -38,7 +37,7 @@ const PatientLogin = () => {
             navigate('/patient/dashboard');
         }
       } else {
-        const regResp = await axios.post(`${apiUrl}/api/patient/register`, formData);
+        const regResp = await apiClient.post('/api/patient/register', formData);
         if (regResp.data.success) {
             const pat = regResp.data.patient;
             setUser({ id: pat.id, name: pat.name, role: 'patient', cpf: pat.cpf, age: pat.age, email: pat.email });

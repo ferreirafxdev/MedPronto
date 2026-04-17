@@ -1,40 +1,4 @@
-import React, { useEffect, useState } from 'react';
-import { useStore } from '../../store/useStore';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import {
-  User, Calendar, Stethoscope, Clock,
-  Download, ClipboardList, PenTool,
-  Shield, ArrowLeft, Loader2, Mail, Hash
-} from 'lucide-react';
-
-interface Consultation {
-  id: string;
-  notes: string;
-  prescriptions: string;
-  exams: string;
-  pdf_path: string;
-  doctor_name: string;
-  doctor_crm: string;
-  created_at: string;
-}
-
-interface Atestado {
-  id: string;
-  code: string;
-  doctor_name: string;
-  doctor_crm: string;
-  days_off: number;
-  cid: string;
-  created_at: string;
-}
-
-interface ProfileData {
-  patient: { id: string; name: string; cpf: string; age: string; email: string; created_at: string };
-  consultations: Consultation[];
-  atestados: Atestado[];
-  summary: { totalConsultations: number; totalAtestados: number; lastVisit: string | null };
-}
+import apiClient from '../../api/client';
 
 const PatientProfile = () => {
   const { user } = useStore();
@@ -54,8 +18,7 @@ const PatientProfile = () => {
   const fetchProfile = async () => {
     setLoading(true);
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-      const resp = await axios.get(`${apiUrl}/api/patient/history/${user?.cpf}`);
+      const resp = await apiClient.get(`/api/patient/history/${user?.cpf}`);
       if (resp.data.success) {
         setData(resp.data);
       }

@@ -1,6 +1,4 @@
-import React, { useState } from 'react';
-import axios from 'axios';
-import { Search, CheckCircle, XCircle, FileText, Calendar, User, UserCheck } from 'lucide-react';
+import apiClient from '../api/client';
 
 const VerifyAtestado = () => {
   const [code, setCode] = useState('');
@@ -13,8 +11,7 @@ const VerifyAtestado = () => {
     if (!code) return;
     setLoading(true); setError(''); setResult(null);
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-      const resp = await axios.get(`${apiUrl}/api/validate-atestado/${code.trim().toUpperCase()}`);
+      const resp = await apiClient.get(`/api/validate-atestado/${code.trim().toUpperCase()}`);
       setResult(resp.data.atestado);
     } catch (err: any) { setError(err.response?.data?.error || 'Erro ao validar código.'); }
     finally { setLoading(false); }
