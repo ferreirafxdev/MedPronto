@@ -1,3 +1,5 @@
+import React, { useState } from 'react';
+import { FileText, Search, XCircle, CheckCircle, User, UserCheck, Calendar } from 'lucide-react';
 import apiClient from '../api/client';
 
 const VerifyAtestado = () => {

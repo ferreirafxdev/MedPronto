@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { io } from 'socket.io-client';
 import apiClient from '../../api/client';
-import { CheckCircle, Edit3, ClipboardList, PenTool, FileText, Download, Send } from 'lucide-react';
+import { CheckCircle, Edit3, ClipboardList, PenTool, FileText, Download, Send, ShieldCheck } from 'lucide-react';
 import { JitsiMeeting } from '@jitsi/react-sdk';
 
 const ConsultationRoom = () => {

@@ -1,3 +1,7 @@
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useStore } from '../../store/useStore';
+import { Stethoscope, User as UserIcon, Lock, Loader2 } from 'lucide-react';
 import apiClient from '../../api/client';
 
 const DoctorLogin = () => {

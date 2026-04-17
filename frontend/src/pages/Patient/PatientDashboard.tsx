@@ -1,3 +1,8 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useStore } from '../../store/useStore';
+import { Loader2, Activity, Clock, Wifi, Video, FileText } from 'lucide-react';
+import { io } from 'socket.io-client';
 import apiClient from '../../api/client';
 
 const PatientDashboard = () => {

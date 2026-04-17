@@ -1,4 +1,40 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useStore } from '../../store/useStore';
+import { 
+  Loader2, User, Stethoscope, PenTool, Shield, 
+  ArrowLeft, Hash, Mail, Calendar, Download, 
+  Clock, ClipboardList 
+} from 'lucide-react';
 import apiClient from '../../api/client';
+
+interface Consultation {
+  id: string;
+  created_at: string;
+  doctor_name: string;
+  doctor_crm: string;
+  notes: string;
+  prescriptions: string;
+  exams: string;
+  pdf_path: string;
+}
+
+interface ProfileData {
+  patient: {
+    name: string;
+    cpf: string;
+    email: string;
+    age: string;
+    created_at: string;
+  };
+  summary: {
+    totalConsultations: number;
+    totalAtestados: number;
+    lastVisit: string;
+  };
+  consultations: Consultation[];
+  atestados: any[];
+}
 
 const PatientProfile = () => {
   const { user } = useStore();
