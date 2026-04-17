@@ -13,6 +13,10 @@ import Stripe from 'stripe';
 import { streamToBuffer } from './utils';
 import sql from './db';
 import { BirdIdService } from './birdid';
+import dns from 'dns';
+
+// Fix for Supabase IPv6 connection issues (EAI_AGAIN)
+dns.setDefaultResultOrder('ipv4first');
 
 dotenv.config();
 
