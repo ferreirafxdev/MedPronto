@@ -914,6 +914,7 @@ app.get('/api/doctor/signature/status/:sessionId', async (req, res) => {
 // --- STRIPE ENDPOINTS ---
 
 app.post('/api/payment/create-checkout', async (req, res) => {
+    console.log("💰 [Stripe] Iniciando checkout session...");
     try {
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
