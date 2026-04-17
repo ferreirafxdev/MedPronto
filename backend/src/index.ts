@@ -40,9 +40,29 @@ app.use((err: any, req: any, res: any, next: any) => {
   res.status(500).json({ error: 'Erro interno no servidor.', details: err.message });
 });
 
-// Endpoint de saúde
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', time: new Date().toISOString() });
+// Logger de requisições
+app.use((req, res, next) => {
+    console.log(`🌐 [${new Date().toISOString()}] ${req.method} ${req.path}`);
+    next();
+});
+
+// Endpoint de saúde aprimorado
+app.get('/api/health', async (req, res) => {
+  try {
+    const dbCheck = await sql`SELECT 1 as connected`;
+    res.json({ 
+      status: 'ok', 
+      database: dbCheck[0].connected === 1 ? 'connected' : 'error',
+      time: new Date().toISOString() 
+    });
+  } catch (err: any) {
+    res.json({ 
+      status: 'error', 
+      database: 'disconnected', 
+      error: err.message,
+      time: new Date().toISOString() 
+    });
+  }
 });
 
 const httpServer = createServer(app);
@@ -885,6 +905,16 @@ app.get('/api/doctor/signature/status/:sessionId', async (req, res) => {
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// Catch-all 404 handler for debugging
+app.use((req, res) => {
+  console.log(`🔍 404 at ${req.method} ${req.url}`);
+  res.status(404).json({ 
+    error: 'Rota não encontrada no servidor.', 
+    method: req.method, 
+    path: req.url 
+  });
 });
 
 const PORT = process.env.PORT || 10000;
