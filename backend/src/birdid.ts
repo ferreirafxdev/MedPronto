@@ -82,4 +82,33 @@ export class BirdIdService {
             return 'pending';
         }
     }
+
+    /**
+     * Obtém o token de acesso (Client Credentials) para a API do Vault ID.
+     */
+    public static async authenticate(): Promise<string | null> {
+        if (!BIRDID_CLIENT_ID || !BIRDID_CLIENT_SECRET) return null;
+
+        try {
+            const params = new URLSearchParams();
+            params.append('grant_type', 'client_credentials');
+            params.append('client_id', BIRDID_CLIENT_ID);
+            params.append('client_secret', BIRDID_CLIENT_SECRET);
+
+            const response = await axios.post(`${BIRDID_VAULT_URL}/oauth/token`, params);
+            return response.data.access_token;
+        } catch (error: any) {
+            console.error('❌ Bird ID Auth Error:', error.message);
+            return null;
+        }
+    }
+
+    /**
+     * Placeholder para assinatura de Hash.
+     */
+    static async signHash(hash: string, token: string): Promise<string> {
+        console.log('📝 Assinando hash com Bird ID (Simulado)...');
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        return `signed_${hash}_${Date.now()}`;
+    }
 }
