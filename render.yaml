@@ -12,7 +12,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        value: postgresql://postgres:postgresadmin@db.wrltuhhfqaqlrgoiafph.supabase.co:5432/postgres
+        value: postgresql://postgres.wrltuhhfqaqlrgoiafph:postgresadmin@aws-1-us-east-2.pooler.supabase.com:6543/postgres
       - key: REDIS_URL
         sync: false
       - key: SUPABASE_URL
@@ -25,3 +25,5 @@ services:
         value: admin123
       - key: CORS_ORIGIN
         value: https://med-pronto-wph4.vercel.app
+      - key: STRIPE_SECRET_KEY
+        sync: false
