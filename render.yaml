@@ -26,4 +26,4 @@ services:
       - key: CORS_ORIGIN
         value: https://med-pronto-wph4.vercel.app
       - key: STRIPE_SECRET_KEY
-        sync: false
+        value: sk_test_51TNL6h2evtMu1OfR2oR6WLYlM5LS6YkYD2qoBU6mHmHn4idMt7C96jQlbs1xm0ZfSqJUBRynDzhIX75tHbZ007VS00jmDBUFAT
