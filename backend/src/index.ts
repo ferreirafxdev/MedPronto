@@ -25,18 +25,12 @@ const allowedOrigins = [
 ];
 
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
-    const isAllowed = allowedOrigins.some(allowed => {
-      if (allowed instanceof RegExp) return allowed.test(origin);
-      return allowed === origin;
-    });
-    if (isAllowed) callback(null, true);
-    else callback(new Error('Not allowed by CORS'));
-  },
+  origin: allowedOrigins,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
-  credentials: true
+  credentials: true,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
 app.use(express.json());
 
