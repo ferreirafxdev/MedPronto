@@ -18,8 +18,26 @@ const PatientLogin = () => {
     complaint: '' 
   });
 
+  const calculateAge = (birthDate: string) => {
+    if (!birthDate) return '';
+    const today = new Date();
+    const birthDateObj = new Date(birthDate);
+    let age = today.getFullYear() - birthDateObj.getFullYear();
+    const monthDiff = today.getMonth() - birthDateObj.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDateObj.getDate())) {
+      age--;
+    }
+    return age < 0 ? '0' : age.toString();
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => { 
-    setFormData({...formData, [e.target.name]: e.target.value}); 
+    const { name, value } = e.target;
+    if (name === 'birthDate') {
+      const newAge = calculateAge(value);
+      setFormData({ ...formData, [name]: value, age: newAge });
+    } else {
+      setFormData({ ...formData, [name]: value }); 
+    }
   };
 
   const handleAction = async (e: React.FormEvent) => {
@@ -82,8 +100,8 @@ const PatientLogin = () => {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '0.75rem' }}>
                 <div className="form-group">
-                  <label>Idade</label>
-                  <input required name="age" type="number" value={formData.age} onChange={handleChange} className="form-control" placeholder="30" />
+                  <label>Idade (Auto)</label>
+                  <input readOnly name="age" type="number" value={formData.age} className="form-control" placeholder="30" style={{ background: 'var(--bg-subtle)', color: 'var(--text-muted)', cursor: 'not-allowed' }} />
                 </div>
                 <div className="form-group">
                   <label>E-mail</label>
