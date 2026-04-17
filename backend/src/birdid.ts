@@ -15,37 +15,71 @@ export interface BirdIdAuthResponse {
 
 export class BirdIdService {
     /**
-     * Placeholder para autenticação com Bird ID.
-     * Requer Client ID e Client Secret da Soluti/VaultID.
+     * Inicia o fluxo de assinatura digital via Push Notification.
+     * @param cpf CPF do médico que possui a conta Bird ID.
      */
-    static async authenticate(): Promise<string | null> {
+    static async startSignatureFlow(cpf: string): Promise<string | null> {
         if (!BIRDID_CLIENT_ID || !BIRDID_CLIENT_SECRET) {
-            console.warn('⚠️ Bird ID Credentials missing. Signature will be simulated.');
-            return null;
+            console.warn('⚠️ Bird ID Credentials missing. Simulation mode.');
+            // Retorna um ID de sessão simulado
+            return `sim_session_${Date.now()}`;
         }
 
         try {
-            const params = new URLSearchParams();
-            params.append('grant_type', 'client_credentials');
-            params.append('client_id', BIRDID_CLIENT_ID);
-            params.append('client_secret', BIRDID_CLIENT_SECRET);
+            // 1. Obtém token de acesso da Soluti
+            const token = await this.authenticate();
+            if (!token) return null;
 
-            const response = await axios.post(`${BIRDID_VAULT_URL}/oauth/token`, params);
-            return response.data.access_token;
+            // 2. Inicia o processo de assinatura/autorização (Vault ID /oauth/start)
+            // Identifica o médico pelo CPF e solicita notificação push
+            const response = await axios.post(`${BIRDID_VAULT_URL}/oauth/start`, {
+                username: cpf,
+                client_id: BIRDID_CLIENT_ID,
+                scope: 'signature_session',
+                lifetime: 600 // 10 minutos
+            }, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            const sessionId = response.data.session_id;
+
+            // 3. Dispara a notificação Push explicitamente (opcional se não automático)
+            await axios.post(`${BIRDID_VAULT_URL}/oauth/notify`, {
+                session_id: sessionId
+            }, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            return sessionId;
         } catch (error: any) {
-            console.error('❌ Bird ID Auth Error:', error.message);
+            console.error('❌ Error initiating Bird ID flow:', error.response?.data || error.message);
             return null;
         }
     }
 
     /**
-     * Placeholder para assinatura de Hash.
-     * Na integração real, o PDF é "hasheado" e enviado para assinatura via PAdES.
+     * Verifica o status da assinatura no App do médico.
+     * @param sessionId ID da sessão retornado no startSignatureFlow.
      */
-    static async signHash(hash: string, token: string): Promise<string> {
-        console.log('📝 Assinando hash com Bird ID (Simulado)...');
-        // Simulação de delay de rede
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        return `signed_${hash}_${Date.now()}`;
+    static async checkSignatureStatus(sessionId: string): Promise<'pending' | 'ready' | 'denied'> {
+        if (sessionId.startsWith('sim_session_')) {
+            // Simulação: pronto após 3 segundos
+            const age = Date.now() - parseInt(sessionId.split('_')[2]);
+            return age > 5000 ? 'ready' : 'pending';
+        }
+
+        try {
+            const token = await this.authenticate();
+            const response = await axios.get(`${BIRDID_VAULT_URL}/oauth/status/${sessionId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            const status = response.data.status; // 'approved', 'pending', 'rejected'
+            if (status === 'approved') return 'ready';
+            if (status === 'rejected') return 'denied';
+            return 'pending';
+        } catch (error: any) {
+            return 'pending';
+        }
     }
 }

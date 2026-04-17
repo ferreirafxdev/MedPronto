@@ -863,6 +863,36 @@ io.on('connection', (socket) => {
   });
 });
 
+// --- Bird ID Digital Signature Flow ---
+
+// Iniciar fluxo de assinatura (Disparar Push)
+app.post('/api/doctor/signature/start', async (req, res) => {
+    const { doctorId } = req.body;
+    try {
+        const [doctor] = await sql`SELECT * FROM doctors WHERE id = ${doctorId}`;
+        if (!doctor) return res.status(404).json({ error: 'Médico não encontrado' });
+        if (!doctor.cpf) return res.status(400).json({ error: 'CPF do médico não cadastrado para Bird ID' });
+
+        const sessionId = await BirdIdService.startSignatureFlow(doctor.cpf);
+        if (!sessionId) return res.status(500).json({ error: 'Falha ao iniciar Bird ID' });
+
+        res.json({ session_id: sessionId });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Verificar status da assinatura
+app.get('/api/doctor/signature/status/:sessionId', async (req, res) => {
+    const { sessionId } = req.params;
+    try {
+        const status = await BirdIdService.checkSignatureStatus(sessionId);
+        res.json({ status });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

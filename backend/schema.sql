@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS doctors (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     crm TEXT UNIQUE NOT NULL,
+    cpf TEXT UNIQUE, -- Added for Bird ID
     email TEXT UNIQUE NOT NULL,
     password TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP

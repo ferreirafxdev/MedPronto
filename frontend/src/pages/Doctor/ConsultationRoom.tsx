@@ -17,6 +17,7 @@ const ConsultationRoom = () => {
   const [daysOff, setDaysOff] = useState('1');
   const [cid, setCid] = useState('');
   const [loading, setLoading] = useState(false);
+  const [signingStatus, setSigningStatus] = useState<'idle' | 'notified' | 'signed' | 'error'>('idle');
   const [messages, setMessages] = useState<{sender: string, text: string, time: string}[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [socket, setSocket] = useState<any>(null);
@@ -51,6 +52,39 @@ const ConsultationRoom = () => {
       const link = document.createElement('a'); link.href = url; link.setAttribute('download', filename); document.body.appendChild(link); link.click(); link.remove();
       alert(`✅ ${endpoint} gerado com sucesso!`);
     } catch (err) { alert(`Erro ao gerar ${endpoint}.`); } finally { setLoading(false); }
+  };
+
+  const startDigitalSignature = async () => {
+    if (!user?.id) return;
+    setLoading(true);
+    try {
+      const resp = await apiClient.post('/api/doctor/signature/start', { doctorId: user.id });
+      const sessionId = resp.data.session_id;
+      setSigningStatus('notified');
+      
+      // Poll for status
+      const interval = setInterval(async () => {
+        try {
+          const statusResp = await apiClient.get(`/api/doctor/signature/status/${sessionId}`);
+          if (statusResp.data.status === 'ready') {
+            setSigningStatus('signed');
+            clearInterval(interval);
+            alert("✅ Receita assinada digitalmente com sucesso!");
+          } else if (statusResp.data.status === 'denied') {
+            setSigningStatus('error');
+            clearInterval(interval);
+            alert("❌ Assinatura negada no aplicativo.");
+          }
+        } catch (e) {
+          clearInterval(interval);
+        }
+      }, 3000);
+    } catch (err: any) {
+      alert("Erro ao iniciar assinatura: " + (err.response?.data?.error || err.message));
+      setSigningStatus('idle');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const endConsultation = async () => {
@@ -157,9 +191,33 @@ const ConsultationRoom = () => {
               <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                 <SectionHeader title="Receituário Digital" desc="Medicamentos e posologia." />
                 <textarea className="form-control" style={{ flexGrow: 1, resize: 'none', minHeight: '80px' }} value={prescriptions} onChange={e=>setPrescriptions(e.target.value)} placeholder="Dipirona 500mg, 6/6h..." />
-                <button className="btn btn-secondary" onClick={() => downloadPDF('receita', { prescriptions }, `receita_${roomId?.substring(0,8)}.pdf`)} disabled={loading} style={{ marginTop: '0.65rem', width: '100%' }}>
-                  {loading ? "Gerando..." : <><Download size={15} /> Baixar Receita (PDF)</>}
-                </button>
+                
+                <div style={{ display: 'flex', gap: '0.65rem', marginTop: '0.65rem' }}>
+                  <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => downloadPDF('receita', { prescriptions }, `receita_${roomId?.substring(0,8)}.pdf`)} disabled={loading}>
+                    {loading ? "Gerando..." : <><Download size={15} /> Baixar PDF</>}
+                  </button>
+                  
+                  <button 
+                    className={`btn ${signingStatus === 'signed' ? 'btn-secondary' : 'btn-primary'}`} 
+                    style={{ flex: 1.5, position: 'relative' }} 
+                    onClick={startDigitalSignature} 
+                    disabled={loading || signingStatus === 'notified' || signingStatus === 'signed'}
+                  >
+                    {signingStatus === 'notified' ? (
+                      <><div className="animate-spin" style={{ width: '14px', height: '14px', border: '2px solid white', borderTopColor: 'transparent', borderRadius: '50%' }} /> Aguardando App...</>
+                    ) : signingStatus === 'signed' ? (
+                      <><ShieldCheck size={16} /> Receita Assinada</>
+                    ) : (
+                      <><PenTool size={16} /> Assinar Receita (Bird ID)</>
+                    )}
+                  </button>
+                </div>
+
+                {signingStatus === 'notified' && (
+                  <p style={{ fontSize: '0.7rem', color: 'var(--accent)', marginTop: '0.4rem', textAlign: 'center', fontWeight: 600 }}>
+                    📲 Verifique a notificação no seu celular agora.
+                  </p>
+                )}
               </div>
             )}
             {activeTab === 'atestado' && (
