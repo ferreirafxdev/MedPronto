@@ -34,12 +34,6 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Middleware de log de erros global
-app.use((err: any, req: any, res: any, next: any) => {
-  console.error('🔥 Erro Global Detectado:', err);
-  res.status(500).json({ error: 'Erro interno no servidor.', details: err.message });
-});
-
 // Logger de requisições
 app.use((req, res, next) => {
     console.log(`🌐 [${new Date().toISOString()}] ${req.method} ${req.path}`);
@@ -159,6 +153,7 @@ app.post('/api/patient/auth', async (req, res) => {
 });
 
 app.post('/api/patient/register', async (req, res) => {
+  console.log('📝 Recebendo registro de paciente:', req.body?.name);
   try {
     const { name, cpf, age, email, birthDate } = req.body;
     // Insert real patient into Neon
@@ -907,14 +902,20 @@ app.get('/api/doctor/signature/status/:sessionId', async (req, res) => {
   }
 });
 
-// Catch-all 404 handler for debugging
+// Catch-all 404 handler for debugging (MUST BE AFTER ROUTES)
 app.use((req, res) => {
-  console.log(`🔍 404 at ${req.method} ${req.url}`);
+  console.log(`🔍 404 at ${req.method} ${req.path}`);
   res.status(404).json({ 
     error: 'Rota não encontrada no servidor.', 
     method: req.method, 
-    path: req.url 
+    path: req.path 
   });
+});
+
+// Middleware de log de erros global (MUST BE LAST)
+app.use((err: any, req: any, res: any, next: any) => {
+  console.error('🔥 Erro Global Detectado:', err);
+  res.status(500).json({ error: 'Erro interno no servidor.', details: err.message });
 });
 
 const PORT = process.env.PORT || 10000;
