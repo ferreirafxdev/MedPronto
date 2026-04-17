@@ -121,5 +121,3 @@ const NavLink = ({ to, active, icon, label, onClick }: { to: string; active: boo
 );
 
 export default Header;
-
-export default Header;
