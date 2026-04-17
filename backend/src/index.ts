@@ -9,6 +9,7 @@ import PDFDocument from 'pdfkit';
 import { v4 as uuidv4 } from 'uuid';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import Stripe from 'stripe';
 import { streamToBuffer } from './utils';
 import sql from './db';
 import { BirdIdService } from './birdid';
@@ -16,6 +17,10 @@ import { BirdIdService } from './birdid';
 dotenv.config();
 
 const app = express();
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+    apiVersion: '2025-01-27',
+});
+
 const allowedOrigins = [
   'http://localhost:5173',
   'http://127.0.0.1:5173',
@@ -906,6 +911,47 @@ app.get('/api/doctor/signature/status/:sessionId', async (req, res) => {
   }
 });
 
+// --- STRIPE ENDPOINTS ---
+
+app.post('/api/payment/create-checkout', async (req, res) => {
+    try {
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'],
+            line_items: [{
+                price_data: {
+                    currency: 'brl',
+                    product_data: {
+                        name: 'Consulta Médica - MedPronto',
+                        description: 'Acesso ao atendimento médico online imediato.',
+                    },
+                    unit_amount: 5000, // R$ 50,00
+                },
+                quantity: 1,
+            }],
+            mode: 'payment',
+            success_url: `${req.headers.origin}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${req.headers.origin}/patient/login`,
+        });
+        res.json({ url: session.url });
+    } catch (error: any) {
+        console.error("Stripe Error:", error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/payment/verify-session/:sessionId', async (req, res) => {
+    try {
+        const session = await stripe.checkout.sessions.retrieve(req.params.sessionId);
+        if (session.payment_status === 'paid') {
+            res.json({ success: true });
+        } else {
+            res.json({ success: false, status: session.payment_status });
+        }
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Catch-all 404 handler for debugging (MUST BE AFTER ROUTES)
 app.use((req, res) => {
   console.log(`🔍 404 at ${req.method} ${req.path}`);
@@ -922,7 +968,7 @@ app.use((err: any, req: any, res: any, next: any) => {
   res.status(500).json({ error: 'Erro interno no servidor.', details: err.message });
 });
 
-const PORT = process.env.PORT || 10000;
+const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
