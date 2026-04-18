@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { io } from 'socket.io-client';
-import { JitsiMeeting } from '@jitsi/react-sdk';
+// Mirotalk WebRTC Integration
 
 const PatientConsultationRoom = () => {
   const { roomId } = useParams();
@@ -27,12 +27,11 @@ const PatientConsultationRoom = () => {
         <h2 style={{ margin: 0, fontSize: '1.15rem' }}>Telemedicina — <span className="text-gradient">Pronto Socorro</span></h2>
         <span className="status-badge status-active">Aguarde o Médico</span>
       </div>
-      <div className="video-container" style={{ height: 'calc(100vh - 180px)', position: 'relative' }}>
-          <JitsiMeeting domain="meet.jit.si" roomName={roomName}
-              configOverwrite={{ startWithAudioMuted: false, startWithVideoMuted: false, prejoinPageEnabled: false, disableDeepLinking: true }}
-              interfaceConfigOverwrite={{ DISABLE_JOIN_LEAVE_NOTIFICATIONS: true, SHOW_JITSI_WATERMARK: false, SHOW_WATERMARK_FOR_GUESTS: false, TOOLBAR_BUTTONS: ['microphone', 'camera', 'chat', 'hangup', 'fullscreen'] }}
-              userInfo={{ displayName: user?.name || 'Paciente', email: user?.email || 'paciente@medpronto.com' }}
-              getIFrameRef={(iframeRef: any) => { iframeRef.style.height = '100%'; iframeRef.style.width = '100%'; iframeRef.style.border = 'none'; }}
+      <div className="video-container" style={{ height: 'calc(100vh - 180px)', position: 'relative', borderRadius: 'var(--radius-xl)', overflow: 'hidden', border: '1px solid var(--border)' }}>
+          <iframe
+            src={`https://p2p.mirotalk.com/join/${roomName}?name=${encodeURIComponent(user?.name || 'Paciente')}`}
+            style={{ width: '100%', height: '100%', border: 'none' }}
+            allow="camera; microphone; display-capture; fullscreen; clipboard-read; clipboard-write; speaker-selection"
           />
       </div>
     </div>

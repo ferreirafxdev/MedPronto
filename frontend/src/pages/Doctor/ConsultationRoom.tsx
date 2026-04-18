@@ -4,7 +4,7 @@ import { useStore } from '../../store/useStore';
 import { io } from 'socket.io-client';
 import apiClient from '../../api/client';
 import { CheckCircle, Edit3, ClipboardList, PenTool, FileText, Download, Send, ShieldCheck } from 'lucide-react';
-import { JitsiMeeting } from '@jitsi/react-sdk';
+// Mirotalk WebRTC Integration - Replacing Jitsi
 
 const ConsultationRoom = () => {
   const { roomId } = useParams();
@@ -140,10 +140,10 @@ const ConsultationRoom = () => {
         {/* Left: Video and Chat */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
           <div className="video-card" style={{ flexGrow: 1, background: '#0f172a', borderRadius: '1.5rem', overflow: 'hidden', border: '1px solid #334155', position: 'relative' }}>
-             <JitsiMeeting domain="meet.jit.si" roomName={roomName}
-               configOverwrite={{ startWithAudioMuted: false, startWithVideoMuted: false, prejoinPageEnabled: false, disableDeepLinking: true, toolbarButtons: ['microphone', 'camera', 'desktop', 'hangup', 'tileview'] }}
-               userInfo={{ displayName: user?.name || 'Médico', email: user?.email || 'medico@medpronto.com' }}
-               getIFrameRef={(ref) => { ref.style.height = '100%'; ref.style.width = '100%'; ref.style.border = 'none'; }}
+             <iframe
+               src={`https://p2p.mirotalk.com/join/${roomName}?name=${encodeURIComponent(user?.name || 'Médico')}`}
+               style={{ width: '100%', height: '100%', border: 'none' }}
+               allow="camera; microphone; display-capture; fullscreen; clipboard-read; clipboard-write; speaker-selection"
              />
           </div>
           <div className="chat-card" style={{ height: '180px', background: 'white', borderRadius: '1.25rem', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
