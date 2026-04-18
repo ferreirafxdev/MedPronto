@@ -13,6 +13,7 @@ import Stripe from 'stripe';
 import { streamToBuffer } from './utils';
 import sql from './db';
 import { BirdIdService } from './birdid';
+import { PDFTemplate } from './PDFTemplate';
 import dns from 'dns';
 
 // Fix for Supabase IPv6 connection issues (EAI_AGAIN)
@@ -558,73 +559,20 @@ app.post('/api/atestado', async (req, res) => {
         VALUES (${validationCode}, ${patientId}, ${doctorId}, ${parseInt(daysOff)}, ${cid || null}, ${patient.name}, ${doctor.name}, ${doctor.crm})
     `;
 
-    const doc = new PDFDocument({ margins: { top: 30, left: 60, right: 60, bottom: 30 }, size: 'A4' });
+    const template = new PDFTemplate();
+    const doc = template.getDocument();
     const buffers: Buffer[] = [];
     doc.on('data', buffers.push.bind(buffers));
 
-    const primaryTeal = '#004e66';
-    const highlightTeal = '#0097b2';
-    const cleanGreen = '#22c55e';
-    const darkGrey = '#1e293b';
-
-    // HEADER - CENTERED LOGO (NO OVERLAP)
-    const logoY = 40;
-    doc.fontSize(26).font('Helvetica-Bold');
-    const widthMed = doc.widthOfString('MedPronto');
-    const widthOn = doc.widthOfString('Online');
-    const startX = (doc.page.width - (widthMed + widthOn)) / 2;
-
-    doc.fillColor(primaryTeal).text('MedPronto', startX, logoY, { continued: true });
-    doc.fillColor(highlightTeal).text('Online', { continued: false });
-
-    doc.fillColor('#64748b').fontSize(8).font('Helvetica').text('PRONTO SOCORRO ONLINE & TELEMEDICINA', 0, 72, { align: 'center', characterSpacing: 1 });
-    doc.strokeColor(highlightTeal).lineWidth(1.2).moveTo(60, 95).lineTo(535, 95).stroke();
-
-    // TITLE
-    doc.fillColor(darkGrey).fontSize(18).font('Helvetica-Bold').text('ATESTADO MÉDICO', 0, 135, { align: 'center' });
-    doc.strokeColor(darkGrey).lineWidth(0.8).moveTo(220, 155).lineTo(375, 155).stroke();
-
-    // FIELDS
-    const formStartY = 190;
-    doc.fillColor(primaryTeal).fontSize(11).font('Helvetica-Bold').text('Paciente: ', 60, formStartY);
-    doc.fillColor('#000').font('Helvetica').text(patient.name.toUpperCase(), 120, formStartY);
-    doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(120, formStartY + 12).lineTo(535, formStartY + 12).stroke();
-
-    const formY2 = 225;
-    doc.fillColor(primaryTeal).font('Helvetica-Bold').text('CPF: ', 60, formY2);
-    doc.fillColor('#000').font('Helvetica').text(patient.cpf, 100, formY2);
-    doc.strokeColor('#e2e8f0').moveTo(100, formY2 + 12).lineTo(250, formY2 + 12).stroke();
-
-    doc.fillColor(primaryTeal).font('Helvetica-Bold').text('RG: ', 270, formY2);
-    doc.strokeColor('#e2e8f0').moveTo(300, formY2 + 12).lineTo(480, formY2 + 12).stroke();
-
-    // BODY (ONE PAGE COMPACT)
+    template.drawLayout('Atestado Médico', doctor.name, doctor.crm);
+    
     const now = new Date();
     const formattedDate = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()}`;
 
-    doc.fillColor(darkGrey).fontSize(11.5).font('Helvetica').lineGap(8);
-    const bodyText = `Atesto, para os devidos fins, que o paciente acima identificado foi atendido via teleconsulta nesta data, apresentando quadro clínico que justifica o afastamento de suas atividades por ${daysOff} (________________) dias, a contar de ${formattedDate}.`;
+    const bodyText = `Atesto, para os devidos fins, que o(a) paciente ${patient.name.toUpperCase()}, portador(a) do CPF ${patient.cpf}, foi atendido(a) via teleconsulta nesta data, apresentando quadro clínico que justifica o afastamento de suas atividades por ${daysOff} dias, a contar de ${formattedDate}.\n\nCID: ${cid || 'Não informado'}.\n\nCódigo de Autenticação: ${validationCode}`;
 
-    doc.text(bodyText, 60, 280, { align: 'justify', width: 475 });
-    doc.moveDown(1.5);
-    doc.text(`CID: ${cid || '_________'} (conforme autorização do paciente).`);
-
-    // SIGNATURE & FOOTER FIXED POSITIONS
-    const pageBottom = 842;
-    const signatureY = pageBottom - 230;
-    doc.strokeColor('#000').lineWidth(0.5).moveTo(200, signatureY).lineTo(400, signatureY).stroke();
-    doc.fontSize(10).font('Helvetica-Bold').text(`Dr(a). ${doctor.name}`, 0, signatureY + 8, { align: 'center' });
-    doc.fontSize(9).font('Helvetica').text(`CRM: ${doctor.crm} / UF: SP`, 0, signatureY + 20, { align: 'center' });
-
-    const footerY = pageBottom - 110;
-    doc.fillColor(cleanGreen).rect(205, footerY, 185, 20).fill();
-    doc.fillColor('white').fontSize(7.5).font('Helvetica-Bold').text('ASSINADO DIGITALMENTE - PADRÃO ICP-BRASIL', 205, footerY + 6.5, { align: 'center', width: 185 });
-
-    doc.fillColor('#94a3b8').fontSize(6.5).font('Helvetica').text('MedProntoOnline Tecnologia S.A. | Validar em: www.medprontoonline.com.br/validar', 0, footerY + 30, { align: 'center' });
-    doc.text('Este documento possui validade jurídica em todo território nacional.', 0, footerY + 40, { align: 'center' });
-    doc.fillColor(primaryTeal).fontSize(8).font('Helvetica-Bold').text(`AUTENTICAÇÃO: ${validationCode}`, 0, footerY + 55, { align: 'center' });
-
-    doc.end();
+    template.addContent(bodyText);
+    template.finalize();
 
     doc.on('end', () => {
       const finalBuffer = Buffer.concat(buffers);
@@ -652,54 +600,16 @@ app.post('/api/receita', async (req, res) => {
     const doctor = docResults[0];
     if (!doctor) return res.status(404).json({ error: 'Dados do médico não encontrados.' });
 
-    const doc = new PDFDocument({ margins: { top: 30, left: 60, right: 60, bottom: 30 }, size: 'A4' });
+    const template = new PDFTemplate();
+    const doc = template.getDocument();
     const buffers: Buffer[] = [];
     doc.on('data', buffers.push.bind(buffers));
 
-    const primaryTeal = '#004e66';
-    const highlightTeal = '#0097b2';
-    const cleanGreen = '#22c55e';
-    const darkGrey = '#1e293b';
-
-    // HEADER - CENTERED LOGO
-    const logoY = 40;
-    doc.fontSize(26).font('Helvetica-Bold');
-    const widthMed = doc.widthOfString('MedPronto');
-    const widthOn = doc.widthOfString('Online');
-    const totalWidth = widthMed + widthOn;
-    const startX = (doc.page.width - totalWidth) / 2;
-
-    doc.fillColor(primaryTeal).text('MedPronto', startX, logoY, { continued: true });
-    doc.fillColor(highlightTeal).text('Online', { continued: false });
-
-    doc.fillColor('#64748b').fontSize(8).font('Helvetica').text('RECEITUÁRIO MÉDICO DIGITAL', 0, 72, { align: 'center', characterSpacing: 1 });
-    doc.strokeColor(highlightTeal).lineWidth(1.2).moveTo(60, 95).lineTo(535, 95).stroke();
-
-    // TITLE
-    doc.fillColor(darkGrey).fontSize(18).font('Helvetica-Bold').text('PRESCRIÇÃO MÉDICA', 0, 135, { align: 'center' });
-    doc.strokeColor(darkGrey).lineWidth(0.8).moveTo(210, 155).lineTo(385, 155).stroke();
-
-    const formStartY = 190;
-    doc.fillColor(primaryTeal).fontSize(11).font('Helvetica-Bold').text('Paciente: ', 60, formStartY);
-    doc.fillColor('#000').font('Helvetica').text(patient.name.toUpperCase(), 120, formStartY);
-    doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(120, formStartY + 12).lineTo(535, formStartY + 12).stroke();
-
-    // CONTENT
-    doc.fillColor(darkGrey).fontSize(13).font('Helvetica').lineGap(8);
-    doc.text(prescriptions || 'Sem prescrições registradas.', 60, 240, { width: 475, align: 'left' });
-
-    // SIGNATURE & FOOTER
-    const pageBottom = 842;
-    const signatureY = pageBottom - 180;
-    doc.strokeColor('#000').lineWidth(0.5).moveTo(200, signatureY).lineTo(400, signatureY).stroke();
-    doc.fontSize(10).font('Helvetica-Bold').text(`Dr(a). ${doctor.name}`, 0, signatureY + 8, { align: 'center' });
-    doc.fontSize(9).font('Helvetica').text(`CRM: ${doctor.crm}`, 0, signatureY + 20, { align: 'center' });
-
-    const footerY = pageBottom - 80;
-    doc.fillColor(cleanGreen).rect(205, footerY, 185, 20).fill();
-    doc.fillColor('white').fontSize(7.5).font('Helvetica-Bold').text('ASSINADO DIGITALMENTE - PADRÃO ICP-BRASIL', 205, footerY + 6.5, { align: 'center', width: 185 });
-
-    doc.end();
+    template.drawLayout('Prescrição Médica', doctor.name, doctor.crm);
+    
+    template.addContent(`Paciente: ${patient.name.toUpperCase()}\nCPF: ${patient.cpf}\n\nPrescrições:\n${prescriptions || 'Sem prescrições registradas.'}`);
+    
+    template.finalize();
     doc.on('end', () => {
       const pdfBuffer = Buffer.concat(buffers);
       res.setHeader('Content-Type', 'application/pdf');
@@ -724,61 +634,16 @@ app.post('/api/exames', async (req, res) => {
     const doctor = docResults[0];
     if (!doctor) return res.status(404).json({ error: 'Dados do médico não encontrados.' });
 
-    const doc = new PDFDocument({ margins: { top: 30, left: 60, right: 60, bottom: 30 }, size: 'A4' });
+    const template = new PDFTemplate();
+    const doc = template.getDocument();
     const buffers: Buffer[] = [];
     doc.on('data', buffers.push.bind(buffers));
 
-    const primaryTeal = '#004e66';
-    const highlightTeal = '#0097b2';
-    const cleanGreen = '#22c55e';
-    const darkGrey = '#1e293b';
+    template.drawLayout('Requisição de Exames', doctor.name, doctor.crm);
+    
+    template.addContent(`Paciente: ${patient.name.toUpperCase()}\nCPF: ${patient.cpf}\n\nSolicito a realização dos seguintes exames para fins diagnósticos:\n\n${exams || 'Nenhum exame detalhado.'}`);
 
-    // HEADER - FIXED (NO OVERLAP)
-    const logoY = 40;
-    doc.fontSize(26).font('Helvetica-Bold');
-    const widthMed = doc.widthOfString('MedPronto');
-    const widthOn = doc.widthOfString('Online');
-    const startX = (doc.page.width - (widthMed + widthOn)) / 2;
-
-    doc.fillColor(primaryTeal).text('MedPronto', startX, logoY, { continued: true });
-    doc.fillColor(highlightTeal).text('Online', { continued: false });
-
-    doc.fillColor('#64748b').fontSize(8).font('Helvetica').text('SOLICITAÇÃO DE EXAMES E PROCEDIMENTOS', 0, 72, { align: 'center', characterSpacing: 1 });
-    doc.strokeColor(highlightTeal).lineWidth(1.2).moveTo(60, 95).lineTo(535, 95).stroke();
-
-    // TITLE
-    doc.fillColor(darkGrey).fontSize(18).font('Helvetica-Bold').text('REQUISIÇÃO MÉDICA', 0, 135, { align: 'center' });
-    doc.strokeColor(darkGrey).lineWidth(0.8).moveTo(210, 155).lineTo(385, 155).stroke();
-
-    // PATIENT FIELD
-    doc.moveDown(4);
-    const formY1 = 230;
-    doc.fillColor(primaryTeal).fontSize(12).font('Helvetica-Bold').text('Paciente: ', 60, formY1);
-    doc.fillColor('#000').font('Helvetica').text(patient.name.toUpperCase(), 125, formY1);
-    doc.strokeColor('#cbd5e1').lineWidth(0.5).moveTo(125, formY1 + 14).lineTo(535, formY1 + 14).stroke();
-
-    // CONTENT
-    doc.moveDown(4);
-    doc.fillColor(darkGrey).fontSize(13).font('Helvetica-Oblique').lineGap(8);
-    doc.text('Solicito, para fins de investigação diagnóstica, a realização dos seguintes exames:', 60, 300);
-    doc.moveDown(1.5);
-    doc.font('Helvetica-Bold').text(exams || 'Nenhum exame detalhado.', { bulletRadius: 2 });
-
-    // SIGNATURE AREA
-    const signatureY = 560;
-    doc.strokeColor('#000').lineWidth(0.5).moveTo(200, signatureY).lineTo(400, signatureY).stroke();
-    doc.fontSize(11).font('Helvetica-Bold').text(`Dr(a). ${doctor.name}`, 0, signatureY + 8, { align: 'center' });
-    doc.fontSize(10).font('Helvetica').text(`CRM: ${doctor.crm}`, 0, signatureY + 22, { align: 'center' });
-
-    // FOOTER
-    const footerY = 740;
-    doc.fillColor(cleanGreen).rect(200, footerY, 200, 25).fill();
-    doc.fillColor('white').fontSize(8).font('Helvetica-Bold').text('ASSINADO DIGITALMENTE - PADRÃO ICP-BRASIL', 200, footerY + 8, { align: 'center', width: 200 });
-
-    doc.fillColor('#94a3b8').fontSize(7).font('Helvetica').text('Este documento possui validade jurídica em todo território nacional.', 0, footerY + 35, { align: 'center' });
-    doc.text('MedProntoOnline | Autenticidade em www.medprontoonline.com.br/validar', 0, footerY + 45, { align: 'center' });
-
-    doc.end();
+    template.finalize();
     doc.on('end', () => {
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename=exames_${patient.cpf.replace(/\D/g, '')}.pdf`);
