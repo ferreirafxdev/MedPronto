@@ -465,10 +465,10 @@ app.post('/api/end-consultation', authenticateToken, authorizeDoctor, async (req
     const { data: publicUrlData } = supabase.storage.from('s3').getPublicUrl(filePath);
     const pdfUrl = publicUrlData.publicUrl;
 
-    // Save metadata in Neon
+    // Save metadata in DB
     await sql`
         INSERT INTO consultations (patient_id, doctor_id, notes, prescriptions, exams, pdf_path)
-        VALUES (${patient.id}, ${doctorId}, ${notes}, ${prescriptions}, ${exams}, ${pdfUrl})
+        VALUES (${patient.patient_id}, ${doctorId}, ${notes}, ${prescriptions}, ${exams}, ${pdfUrl})
     `;
 
     // Finalize: Remove from DB Queue
