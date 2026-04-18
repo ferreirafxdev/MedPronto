@@ -17,6 +17,8 @@ interface Consultation {
   prescriptions: string;
   exams: string;
   pdf_path: string;
+  receita_pdf_url?: string;
+  exames_pdf_url?: string;
 }
 
 interface ProfileData {
@@ -219,20 +221,36 @@ const PatientProfile = () => {
                     </div>
 
                     {c.prescriptions && (
-                      <div style={{ marginBottom: '0.5rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.25rem' }}>
-                          <PenTool size={13} color="var(--accent)" />
-                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Receita</span>
+                      <div style={{ marginBottom: '1rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.4rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <PenTool size={13} color="var(--accent)" />
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Receita</span>
+                          </div>
+                          {c.receita_pdf_url && (
+                             <button className="btn btn-sm" onClick={() => window.open(c.receita_pdf_url, '_blank')} 
+                               style={{ background: 'var(--accent-ultra-light)', color: 'var(--accent)', border: 'none', fontSize: '0.65rem', padding: '0.2rem 0.5rem', height: 'auto', gap: '0.2rem' }}>
+                               <Download size={10} /> Baixar Receita
+                             </button>
+                          )}
                         </div>
                         <p style={{ fontSize: '0.85rem', color: 'var(--text-body)', margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{c.prescriptions}</p>
                       </div>
                     )}
-
+ 
                     {c.exams && (
                       <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.25rem' }}>
-                          <ClipboardList size={13} color="var(--mint)" />
-                          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--mint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Exames Solicitados</span>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.4rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <ClipboardList size={13} color="var(--mint)" />
+                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--mint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Exames Solicitados</span>
+                          </div>
+                          {c.exames_pdf_url && (
+                             <button className="btn btn-sm" onClick={() => window.open(c.exames_pdf_url, '_blank')} 
+                               style={{ background: 'var(--mint-light)', color: 'var(--mint)', border: 'none', fontSize: '0.65rem', padding: '0.2rem 0.5rem', height: 'auto', gap: '0.2rem' }}>
+                               <Download size={10} /> Baixar Pedido
+                             </button>
+                          )}
                         </div>
                         <p style={{ fontSize: '0.85rem', color: 'var(--text-body)', margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{c.exams}</p>
                       </div>
@@ -272,14 +290,21 @@ const PatientProfile = () => {
                         </span>
                       </div>
                     </div>
-                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                      <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: '0.15rem' }}>CÓDIGO</div>
-                      <span style={{
-                        display: 'inline-block', padding: '0.3rem 0.6rem',
-                        background: 'var(--accent-ultra-light)', color: 'var(--accent)',
-                        borderRadius: 'var(--radius-sm)', fontWeight: 700, fontSize: '0.78rem',
-                        fontFamily: 'monospace', letterSpacing: '0.04em',
-                      }}>{a.code}</span>
+                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexShrink: 0 }}>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: '0.15rem' }}>CÓDIGO</div>
+                        <span style={{
+                          display: 'inline-block', padding: '0.3rem 0.6rem',
+                          background: 'var(--accent-ultra-light)', color: 'var(--accent)',
+                          borderRadius: 'var(--radius-sm)', fontWeight: 700, fontSize: '0.78rem',
+                          fontFamily: 'monospace', letterSpacing: '0.04em',
+                        }}>{a.code}</span>
+                      </div>
+                      {a.pdf_url && (
+                        <button className="btn btn-primary btn-sm" onClick={() => window.open(a.pdf_url, '_blank')} style={{ height: '38px', gap: '0.3rem', padding: '0 0.8rem' }}>
+                          <Download size={14} /> PDF
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))
