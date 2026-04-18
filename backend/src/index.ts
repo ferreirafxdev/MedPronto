@@ -3,7 +3,6 @@ import cors from 'cors';
 import { Server } from 'socket.io';
 import { createServer } from 'http';
 import dotenv from 'dotenv';
-import Redis from 'ioredis';
 import { createClient } from '@supabase/supabase-js';
 import PDFDocument from 'pdfkit';
 import { v4 as uuidv4 } from 'uuid';
@@ -81,31 +80,11 @@ const io = new Server(httpServer, {
 // -- ENV Variables --
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_KEY = process.env.SUPABASE_KEY || ''; // Never commit real keys
-const REDIS_URL = process.env.REDIS_URL || '';
 const JWT_SECRET = process.env.JWT_SECRET || 'medpronto-secret-key-2026';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
-// Instances
-let redis: any = null;
-if (REDIS_URL) {
-  redis = new Redis(REDIS_URL, {
-    tls: { rejectUnauthorized: false },
-    maxRetriesPerRequest: 3,
-    retryStrategy(times) {
-      return Math.min(times * 100, 3000);
-    }
-  });
-
-  redis.on('error', (err: any) => {
-    console.error('❌ Redis Connection Error:', err.message);
-  });
-
-  redis.on('connect', () => {
-    console.log('✅ Connected to Redis');
-  });
-} else {
-  console.warn("⚠️ REDIS_URL não configurada. Cache desabilitado.");
-}
+// Redis removed - Using Supabase PostgreSQL for Queue
+const redis = null;
 
 let supabase: any = null;
 if (SUPABASE_URL && SUPABASE_KEY) {
@@ -229,11 +208,12 @@ app.get('/api/admin/stats', authenticateToken, authorizeAdmin, async (req, res) 
     const patientCount = parseInt(patients[0].count) || 0;
     const doctorCount = parseInt(doctors[0].count) || 0;
 
-    // Revenue simulation
-    const revenue = totalConsultations * 120;
-    const costs = doctorCount * 2000 + (revenue * 0.1);
+    // Fixed Revenue Split: R$ 50 total (R$ 25 Doctor / R$ 25 Site)
+    const revenue = totalConsultations * 50;
+    const costs = totalConsultations * 25; // Paid to doctors
+    const profit = totalConsultations * 25; // Net for site
 
-    res.json({ success: true, stats: { totalConsultations, revenue, costs, patientCount, doctorCount } });
+    res.json({ success: true, stats: { totalConsultations, revenue, costs, profit, patientCount, doctorCount } });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -299,7 +279,7 @@ app.get('/api/doctor/stats/:doctorId', async (req, res) => {
     `;
 
     const totalConsultations = parseInt(results[0].count) || 0;
-    const earnings = totalConsultations * 60; // R$ 60 per consultation
+    const earnings = totalConsultations * 25; // R$ 25 per consultation (split 50/50 with site)
 
     res.json({ success: true, stats: { totalConsultations, earnings } });
   } catch (err: any) {
@@ -309,16 +289,20 @@ app.get('/api/doctor/stats/:doctorId', async (req, res) => {
 
 app.post('/api/admin/reorder-queue', authenticateToken, authorizeAdmin, async (req, res) => {
   try {
-    const { newOrder } = req.body; // Array of patient JSON strings
+    res.status(501).json({ error: 'Not implemented for SQL queue' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
-    // Replace the entire redis list with the new order
-    await redis.del('patient_queue');
-    if (newOrder.length > 0) {
-      await redis.rpush('patient_queue', ...newOrder);
-    }
-
-    io.emit('queue_updated');
-    res.json({ success: true });
+// -- Payment Simulation --
+app.post('/api/payment/pix-simulate', async (req, res) => {
+  try {
+    const { patientId } = req.body;
+    // In a real scenario, we'd check gateway status. 
+    // Here we just return a success bit for the simulated flow.
+    const pixKey = "00020126580014BR.GOV.BCB.PIX0136medpronto-pix-key-simulado-2026520400005303986540550.005802BR5915MEDPRONTO SAUDE6008BRASILIA62070503***6304D1B2";
+    res.json({ success: true, pixKey, amount: 50.00 });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -327,16 +311,19 @@ app.post('/api/admin/reorder-queue', authenticateToken, authorizeAdmin, async (r
 // 1. Patient enqueue
 app.post('/api/enqueue', async (req, res) => {
   try {
-    const { name, cpf, age, email, complaint } = req.body;
-    const patientData = { id: uuidv4(), name, cpf, age, email, complaint, status: 'waiting', timestamp: Date.now() };
-
-    // Push to Upstash Redis list
-    await redis.rpush('patient_queue', JSON.stringify(patientData));
+    const { id, name, complaint } = req.body;
+    
+    // Insert into DB queue
+    const [q] = await sql`
+      INSERT INTO queue (patient_id, name, complaint, status)
+      VALUES (${id}, ${name}, ${complaint}, 'waiting')
+      RETURNING *
+    `;
 
     // Broadcast queue update
     io.emit('queue_updated');
 
-    res.json({ success: true, patient: patientData });
+    res.json({ success: true, patient: q });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -345,9 +332,12 @@ app.post('/api/enqueue', async (req, res) => {
 // 2. Doctor: Get Queue
 app.get('/api/queue', async (req, res) => {
   try {
-    const queueData = await redis.lrange('patient_queue', 0, -1);
-    const parsedQueue = queueData.map((q: string) => JSON.parse(q));
-    res.json({ success: true, queue: parsedQueue });
+    const queue = await sql`
+      SELECT * FROM queue 
+      WHERE status = 'waiting' 
+      ORDER BY created_at ASC
+    `;
+    res.json({ success: true, queue });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -356,13 +346,18 @@ app.get('/api/queue', async (req, res) => {
 app.get('/api/patient/check-queue/:patientId', async (req, res) => {
   try {
     const { patientId } = req.params;
-    const queueData = await redis.lrange('patient_queue', 0, -1);
-    const inQueue = queueData.some((q: string) => JSON.parse(q).id === patientId);
+    
+    const [q] = await sql`
+      SELECT status FROM queue 
+      WHERE patient_id = ${patientId} 
+      LIMIT 1
+    `;
 
-    // Also check if in active consultation
-    const activeConsultation = await redis.get(`consultation:${patientId}`);
-
-    res.json({ success: true, inQueue, isActive: !!activeConsultation });
+    res.json({ 
+      success: true, 
+      inQueue: q?.status === 'waiting', 
+      isActive: q?.status === 'in-consultation' 
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -372,18 +367,25 @@ app.get('/api/patient/check-queue/:patientId', async (req, res) => {
 app.post('/api/take-patient', async (req, res) => {
   try {
     const { doctorId } = req.body;
-    const patientStr = await redis.lpop('patient_queue');
-    if (!patientStr) return res.status(404).json({ error: 'Fila vazia' });
 
-    const patient = JSON.parse(patientStr);
-    patient.doctorId = doctorId;
-    patient.status = 'in-consultation';
+    // Atomic update to take the oldest waiting patient
+    const [patient] = await sql`
+      UPDATE queue 
+      SET status = 'in-consultation', doctor_id = ${doctorId}
+      WHERE id = (
+        SELECT id FROM queue 
+        WHERE status = 'waiting' 
+        ORDER BY created_at ASC 
+        LIMIT 1
+        FOR UPDATE SKIP LOCKED
+      )
+      RETURNING *
+    `;
 
-    // Save consultation to active list mapping
-    await redis.set(`consultation:${patient.id}`, JSON.stringify(patient));
+    if (!patient) return res.status(404).json({ error: 'Fila vazia' });
 
     io.emit('queue_updated');
-    res.json({ success: true, patient });
+    res.json({ success: true, patient: { ...patient, id: patient.patient_id, roomId: patient.patient_id } });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -394,9 +396,8 @@ app.post('/api/end-consultation', authenticateToken, authorizeDoctor, async (req
   try {
     const { patientId, doctorId, notes, prescriptions, exams } = req.body;
 
-    const patientStr = await redis.get(`consultation:${patientId}`);
-    if (!patientStr) return res.status(404).json({ error: 'Consulta não encontrada' });
-    const patient = JSON.parse(patientStr);
+    const [patient] = await sql`SELECT * FROM queue WHERE patient_id = ${patientId} LIMIT 1`;
+    if (!patient) return res.status(404).json({ error: 'Consulta não encontrada' });
 
     // Fetch doctor data from Neon
     const docResults = await sql`SELECT * FROM doctors WHERE id = ${doctorId} LIMIT 1`;
@@ -470,8 +471,8 @@ app.post('/api/end-consultation', authenticateToken, authorizeDoctor, async (req
         VALUES (${patient.id}, ${doctorId}, ${notes}, ${prescriptions}, ${exams}, ${pdfUrl})
     `;
 
-    // Cleanup Redis
-    await redis.del(`consultation:${patientId}`);
+    // Finalize: Remove from DB Queue
+    await sql`DELETE FROM queue WHERE patient_id = ${patientId}`;
 
     // Notify Patient via socket with PDF Download URL
     io.to(patientId).emit('consultation_ended', { pdf_url: pdfUrl });
@@ -488,10 +489,8 @@ app.post('/api/atestado', async (req, res) => {
   try {
     const { patientId, doctorId, daysOff, cid } = req.body;
 
-    // Check consultation in Redis first (active session)
-    const patientStr = await redis.get(`consultation:${patientId}`);
-    if (!patientStr) return res.status(404).json({ error: 'Paciente não encontrado na sessão ativa.' });
-    const patient = JSON.parse(patientStr);
+    const [patient] = await sql`SELECT * FROM queue WHERE patient_id = ${patientId} LIMIT 1`;
+    if (!patient) return res.status(404).json({ error: 'Paciente não encontrado na sessão ativa.' });
 
     // Fetch doctor data for CRM and real Name from Neon
     const docResults = await sql`SELECT * FROM doctors WHERE id = ${doctorId} LIMIT 1`;
@@ -539,9 +538,8 @@ app.post('/api/receita', async (req, res) => {
   try {
     const { patientId, doctorId, prescriptions } = req.body;
 
-    const patientStr = await redis.get(`consultation:${patientId}`);
-    if (!patientStr) return res.status(404).json({ error: 'Paciente não encontrado na sessão ativa.' });
-    const patient = JSON.parse(patientStr);
+    const [patient] = await sql`SELECT * FROM queue WHERE patient_id = ${patientId} LIMIT 1`;
+    if (!patient) return res.status(404).json({ error: 'Paciente não encontrado na sessão ativa.' });
 
     const docResults = await sql`SELECT * FROM doctors WHERE id = ${doctorId} LIMIT 1`;
     const doctor = docResults[0];
@@ -573,9 +571,8 @@ app.post('/api/exames', async (req, res) => {
   try {
     const { patientId, doctorId, exams } = req.body;
 
-    const patientStr = await redis.get(`consultation:${patientId}`);
-    if (!patientStr) return res.status(404).json({ error: 'Paciente não encontrado na sessão ativa.' });
-    const patient = JSON.parse(patientStr);
+    const [patient] = await sql`SELECT * FROM queue WHERE patient_id = ${patientId} LIMIT 1`;
+    if (!patient) return res.status(404).json({ error: 'Paciente não encontrado na sessão ativa.' });
 
     const docResults = await sql`SELECT * FROM doctors WHERE id = ${doctorId} LIMIT 1`;
     const doctor = docResults[0];

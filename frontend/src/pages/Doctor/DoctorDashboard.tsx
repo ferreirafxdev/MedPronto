@@ -49,7 +49,7 @@ const DoctorDashboard = () => {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-        <StatCard icon={<DollarSign size={20} />} bg="var(--mint-light)" color="var(--mint)" label="Renda do Dia (R$ 60/consulta)" value={`R$ ${stats.earnings.toLocaleString('pt-BR')}`} />
+        <StatCard icon={<DollarSign size={20} />} bg="var(--mint-light)" color="var(--mint)" label="Renda do Dia (R$ 25/atendimento)" value={`R$ ${stats.earnings.toLocaleString('pt-BR')}`} />
         <StatCard icon={<TrendingUp size={20} />} bg="var(--accent-ultra-light)" color="var(--accent)" label="Total Atendimentos Hoje" value={`${stats.totalConsultations} Vidas`} />
       </div>
 

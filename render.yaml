@@ -12,18 +12,14 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        value: postgresql://postgres.wrltuhhfqaqlrgoiafph:postgresadmin@aws-1-us-east-2.pooler.supabase.com:6543/postgres
-      - key: REDIS_URL
-        sync: false
+        value: postgresql://postgres:postgresadmin@db.wrltuhhfqaqlrgoiafph.supabase.co:5432/postgres
       - key: SUPABASE_URL
         value: https://wrltuhhfqaqlrgoiafph.supabase.co
       - key: SUPABASE_KEY
         value: sb_publishable_KLL387pq4FBIC84iuMtx5g_f_y531_d
       - key: JWT_SECRET
-        value: medpronto-secret-key-2026
+        generateValue: true
       - key: ADMIN_PASSWORD
-        value: admin123
+        sync: false
       - key: CORS_ORIGIN
-        value: https://med-pronto-wph4.vercel.app
-      - key: STRIPE_SECRET_KEY
-        value: sk_test_51TNL6h2evtMu1OfR2oR6WLYlM5LS6YkYD2qoBU6mHmHn4idMt7C96jQlbs1xm0ZfSqJUBRynDzhIX75tHbZ007VS00jmDBUFAT
+        value: https://medpronto-online.vercel.app

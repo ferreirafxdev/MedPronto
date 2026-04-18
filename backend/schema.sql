@@ -8,9 +8,7 @@ CREATE TABLE IF NOT EXISTS patients (
     age TEXT,
     email TEXT,
     birth_date TEXT,
-    stripe_customer_id TEXT,
-    subscription_id TEXT,
-    subscription_status TEXT DEFAULT 'inactive',
+    birth_date TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -45,5 +43,15 @@ CREATE TABLE IF NOT EXISTS consultations (
     notes TEXT,
     prescriptions TEXT,
     exams TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS queue (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    patient_id UUID REFERENCES patients(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    complaint TEXT NOT NULL,
+    status TEXT DEFAULT 'waiting', -- 'waiting', 'in-consultation'
+    doctor_id UUID REFERENCES doctors(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

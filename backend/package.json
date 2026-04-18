@@ -27,7 +27,6 @@
     "pg": "^8.20.0",
     "postgres": "^3.4.9",
     "socket.io": "^4.8.3",
-    "stripe": "^22.0.2",
     "uuid": "^13.0.0"
   },
   "devDependencies": {

@@ -9,7 +9,7 @@ const AdminDashboard = () => {
     const { user } = useStore();
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<'financas' | 'fila' | 'prontuarios' | 'medicos' | 'pacientes'>('financas');
-    const [stats, setStats] = useState({ totalConsultations: 0, revenue: 0, costs: 0, patientCount: 0, doctorCount: 0 });
+    const [stats, setStats] = useState({ totalConsultations: 0, revenue: 0, costs: 0, profit: 0, patientCount: 0, doctorCount: 0 });
     const [queue, setQueue] = useState<any[]>([]);
     const [doctors, setDoctors] = useState<any[]>([]);
     const [patients, setPatients] = useState<any[]>([]);
@@ -79,13 +79,13 @@ const AdminDashboard = () => {
                     {activeTab === 'financas' && (
                         <div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem' }}>
-                                <MiniCard icon={<TrendingUp size={20} />} bg="var(--mint-light)" color="var(--mint)" label="Faturamento Acumulado" value={`R$ ${stats.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
-                                <MiniCard icon={<Users size={20} />} bg="var(--accent-ultra-light)" color="var(--accent)" label="Total na Base" value={`${stats.patientCount} Pacientes`} />
+                                <MiniCard icon={<TrendingUp size={20} />} bg="var(--mint-light)" color="var(--mint)" label="Receita Bruta (R$ 50/consult)" value={`R$ ${stats.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
+                                <MiniCard icon={<BarChart3 size={20} />} bg="var(--accent-ultra-light)" color="var(--accent)" label="Lucro Líquido Site (R$ 25)" value={`R$ ${stats.profit.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`} />
                             </div>
                             <div style={{ marginTop: '1.25rem', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.65rem' }}>
-                                <Tile label="CONSULTAS" value={stats.totalConsultations} />
-                                <Tile label="MÉDICOS" value={stats.doctorCount} />
-                                <Tile label="CUSTO OP." value={`R$ ${stats.costs.toLocaleString('pt-BR')}`} color="var(--coral)" />
+                                <Tile label="ATENDIMENTOS" value={stats.totalConsultations} />
+                                <Tile label="TOTAL MÉDICOS" value={stats.doctorCount} />
+                                <Tile label="PAGO A MÉDICOS" value={`R$ ${stats.costs.toLocaleString('pt-BR')}`} color="var(--coral)" />
                             </div>
                         </div>
                     )}
