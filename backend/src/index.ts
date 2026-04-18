@@ -431,7 +431,13 @@ app.post('/api/end-consultation', authenticateToken, authorizeDoctor, async (req
   try {
     const { patientId, doctorId, notes, prescriptions, exams } = req.body;
 
-    const [patient] = await sql`SELECT * FROM queue WHERE patient_id = ${patientId} LIMIT 1`;
+    const [patient] = await sql`
+        SELECT q.*, p.cpf, p.birth_date 
+        FROM queue q
+        JOIN patients p ON q.patient_id = p.id
+        WHERE q.patient_id = ${patientId} 
+        LIMIT 1
+    `;
     if (!patient) return res.status(404).json({ error: 'Consulta não encontrada' });
 
     // Fetch doctor data from Neon
@@ -504,7 +510,13 @@ app.post('/api/atestado', async (req, res) => {
   try {
     const { patientId, doctorId, daysOff, cid } = req.body;
 
-    const [patient] = await sql`SELECT * FROM queue WHERE patient_id = ${patientId} LIMIT 1`;
+    const [patient] = await sql`
+        SELECT q.*, p.cpf, p.birth_date 
+        FROM queue q
+        JOIN patients p ON q.patient_id = p.id
+        WHERE q.patient_id = ${patientId} 
+        LIMIT 1
+    `;
     if (!patient) return res.status(404).json({ error: 'Paciente não encontrado na sessão ativa.' });
 
     // Fetch doctor data for CRM and real Name from Neon
@@ -513,11 +525,12 @@ app.post('/api/atestado', async (req, res) => {
     if (!doctor) return res.status(404).json({ error: 'Dados do médico não encontrados.' });
 
     const validationCode = `MP-${uuidv4().substring(0, 8).toUpperCase()}`;
+    const days = parseInt(daysOff) || 1;
 
-    // 2. Save to Neon first
+    // 2. Save to DB first
     await sql`
         INSERT INTO atestados (code, patient_id, doctor_id, days_off, cid, patient_name, doctor_name, doctor_crm)
-        VALUES (${validationCode}, ${patientId}, ${doctorId}, ${parseInt(daysOff)}, ${cid || null}, ${patient.name}, ${doctor.name}, ${doctor.crm})
+        VALUES (${validationCode}, ${patientId}, ${doctorId}, ${days}, ${cid || null}, ${patient.name}, ${doctor.name}, ${doctor.crm})
     `;
 
     const template = new PDFTemplate();
@@ -553,7 +566,13 @@ app.post('/api/receita', async (req, res) => {
   try {
     const { patientId, doctorId, prescriptions } = req.body;
 
-    const [patient] = await sql`SELECT * FROM queue WHERE patient_id = ${patientId} LIMIT 1`;
+    const [patient] = await sql`
+        SELECT q.*, p.cpf, p.birth_date 
+        FROM queue q
+        JOIN patients p ON q.patient_id = p.id
+        WHERE q.patient_id = ${patientId} 
+        LIMIT 1
+    `;
     if (!patient) return res.status(404).json({ error: 'Paciente não encontrado na sessão ativa.' });
 
     const docResults = await sql`SELECT * FROM doctors WHERE id = ${doctorId} LIMIT 1`;
@@ -586,7 +605,13 @@ app.post('/api/exames', async (req, res) => {
   try {
     const { patientId, doctorId, exams } = req.body;
 
-    const [patient] = await sql`SELECT * FROM queue WHERE patient_id = ${patientId} LIMIT 1`;
+    const [patient] = await sql`
+        SELECT q.*, p.cpf, p.birth_date 
+        FROM queue q
+        JOIN patients p ON q.patient_id = p.id
+        WHERE q.patient_id = ${patientId} 
+        LIMIT 1
+    `;
     if (!patient) return res.status(404).json({ error: 'Paciente não encontrado na sessão ativa.' });
 
     const docResults = await sql`SELECT * FROM doctors WHERE id = ${doctorId} LIMIT 1`;
