@@ -23,3 +23,13 @@ services:
         sync: false
       - key: CORS_ORIGIN
         value: https://medpronto-online.vercel.app
+      - key: S3_ENDPOINT
+        value: https://wrltuhhfqaqlrgoiafph.storage.supabase.co/storage/v1/s3
+      - key: S3_REGION
+        value: us-east-2
+      - key: S3_ACCESS_KEY
+        value: 66952d348a5fb2b8737ad7a0f787b73c
+      - key: S3_SECRET_KEY
+        value: 7a62526c33c46b45d5a309915d836f76e0d0eee535f6c0d92506e55e2eae15fd
+      - key: S3_BUCKET
+        value: s3

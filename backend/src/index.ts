@@ -13,6 +13,7 @@ import sql from './db';
 import { BirdIdService } from './birdid';
 import { PDFTemplate } from './PDFTemplate';
 import dns from 'dns';
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
 // Fix for Supabase IPv6 connection issues (EAI_AGAIN)
 dns.setDefaultResultOrder('ipv4first');
@@ -90,7 +91,41 @@ let supabase: any = null;
 if (SUPABASE_URL && SUPABASE_KEY) {
   supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 } else {
-  console.warn("⚠️ SUPABASE_URL ou SUPABASE_KEY não configurados. Upload de PDFs (Storage) não funcionará.");
+  console.warn("⚠️ SUPABASE_URL ou SUPABASE_KEY não configurados.");
+}
+
+// S3 Configuration (Supabase Storage API)
+const S3_ENDPOINT = process.env.S3_ENDPOINT || '';
+const S3_REGION = process.env.S3_REGION || 'us-east-2';
+const S3_ACCESS_KEY = process.env.S3_ACCESS_KEY || '';
+const S3_SECRET_KEY = process.env.S3_SECRET_KEY || '';
+const S3_BUCKET = process.env.S3_BUCKET || 's3';
+
+const s3Client = new S3Client({
+  endpoint: S3_ENDPOINT,
+  region: S3_REGION,
+  credentials: {
+    accessKeyId: S3_ACCESS_KEY,
+    secretAccessKey: S3_SECRET_KEY
+  },
+  forcePathStyle: true // Mandatory for Supabase
+});
+
+async function uploadPDF(bucketName: string, filePath: string, body: Buffer) {
+  const command = new PutObjectCommand({
+    Bucket: bucketName,
+    Key: filePath,
+    Body: body,
+    ContentType: 'application/pdf',
+    ACL: 'public-read'
+  });
+  await s3Client.send(command);
+  
+  // Construct the public URL manually based on Supabase endpoint structure
+  // Endpoint: https://[project-ref].storage.supabase.co/storage/v1/s3
+  // Final URL: https://[project-ref].supabase.co/storage/v1/object/public/[bucket]/[path]
+  const projectRef = S3_ENDPOINT.split('.')[0].split('//')[1];
+  return `https://${projectRef}.supabase.co/storage/v1/object/public/${bucketName}/${filePath}`;
 }
 
 // -- Middleware for Authentication --
@@ -433,37 +468,17 @@ app.post('/api/end-consultation', authenticateToken, authorizeDoctor, async (req
       await BirdIdService.signHash(patientId, birdIdToken);
     }
 
-    if (!supabase) {
-      console.warn("Upload de PDF ignorado: Supabase não configurado.");
-      res.json({ success: true, message: 'Consulta encerrada localmente (Storage não configurado)' });
-      return;
-    }
-
-    // Ensure bucket exists (best effort)
-    const { data: buckets } = await supabase.storage.listBuckets();
-    if (!buckets?.find((b: any) => b.name === 's3')) {
-      await supabase.storage.createBucket('s3', { public: true });
-      console.log("Bucket 's3' criado automaticamente.");
-    }
-
-    // Save to Supabase Storage (S3 API or Standard)
+    // Save to S3 (Supabase S3 API)
     const filePath = `prontuarios/${patientId}_${Date.now()}.pdf`;
-    const { data, error } = await supabase.storage
-      .from('s3')
-      .upload(filePath, pdfBuffer, {
-        contentType: 'application/pdf',
-        cacheControl: '3600',
-        upsert: false
-      });
+    let pdfUrl = '';
 
-    if (error) {
-      console.error("Erro no Supabase Storage:", error.message);
-      // Fallback to local save or return error if critical
+    try {
+      pdfUrl = await uploadPDF(S3_BUCKET, filePath, pdfBuffer);
+      console.log(`✅ Prontuário salvo no S3: ${pdfUrl}`);
+    } catch (error: any) {
+      console.error("Erro no S3 Upload:", error.message);
+      // Fallback or handle error
     }
-
-    // Generate public URL
-    const { data: publicUrlData } = supabase.storage.from('s3').getPublicUrl(filePath);
-    const pdfUrl = publicUrlData.publicUrl;
 
     // Save metadata in DB
     await sql`
