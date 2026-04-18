@@ -924,7 +924,7 @@ app.post('/api/payment/create-checkout', async (req, res) => {
             payment_method_types: ['card', 'pix'],
             payment_method_options: {
                 pix: {
-                    expires_at: Math.floor(Date.now() / 1000) + (30 * 60) // 30 minutos para pagar
+                    expires_after_seconds: 1800 // 30 minutos para pagar
                 }
             },
             line_items: [{
