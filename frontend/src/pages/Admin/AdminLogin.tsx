@@ -50,9 +50,6 @@ const AdminLogin = () => {
               <input type="password" className="form-control" placeholder="••••••••" required value={password} onChange={(e) => setPassword(e.target.value)} style={{ paddingLeft: '2.3rem' }} />
             </div>
           </div>
-          <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '1.25rem', background: 'var(--accent-ultra-light)', border: '1px solid var(--accent-light)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)' }}>
-            💡 Teste: <strong style={{ color: 'var(--text-heading)' }}>admin@medpronto.com</strong> | <strong style={{ color: 'var(--text-heading)' }}>admin123</strong>
-          </div>
           <button type="submit" className="btn btn-primary btn-full" disabled={loading} style={{ height: '44px' }}>
             {loading ? <Loader2 size={18} className="animate-spin" /> : 'Entrar no Painel'}
           </button>
