@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
-import { Loader2, Activity, Clock, Wifi, Video, FileText } from 'lucide-react';
+import { Loader2, Activity, Clock, Wifi, Video, FileText, AlertCircle, ExternalLink } from 'lucide-react';
 import { io } from 'socket.io-client';
 import apiClient from '../../api/client';
 
@@ -68,6 +68,32 @@ const PatientDashboard = () => {
     }
   };
 
+   const handlePortal = async () => {
+    try {
+        const resp = await apiClient.post('/api/payment/portal', { patientId: user?.id });
+        if (resp.data.url) window.location.href = resp.data.url;
+    } catch (e) {
+        alert("Erro ao acessar o portal financeiro.");
+    }
+  };
+
+   const handleSubscribe = async () => {
+    setLoading(true);
+    try {
+        const resp = await apiClient.post('/api/payment/create-checkout', {
+            email: user?.email,
+            patientId: user?.id
+        });
+        if (resp.data.url) window.location.href = resp.data.url;
+    } catch (e) {
+        alert("Erro ao iniciar assinatura.");
+    } finally {
+        setLoading(false);
+    }
+  };
+
+  const isSubscribed = user?.subscription_status === 'active' || user?.subscription_status === 'trialing';
+
   const enterRoom = () => { 
     if(roomData) { 
         setConsultationRoomId(roomData.roomId); 
@@ -87,10 +113,6 @@ const PatientDashboard = () => {
         <div>
             <h2 style={{ fontSize: '1.6rem', marginBottom: '0.2rem' }}>Olá, <span className="text-gradient">{user.name}</span></h2>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Bem-vindo ao seu painel de saúde</p>
-        </div>
-        <div style={{ textAlign: 'right' }}>
-            <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>CPF</span>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-heading)', fontWeight: 600 }}>{user.cpf}</span>
         </div>
       </div>
 

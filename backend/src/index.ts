@@ -9,7 +9,6 @@ import PDFDocument from 'pdfkit';
 import { v4 as uuidv4 } from 'uuid';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import Stripe from 'stripe';
 import { streamToBuffer } from './utils';
 import sql from './db';
 import { BirdIdService } from './birdid';
@@ -22,9 +21,6 @@ dns.setDefaultResultOrder('ipv4first');
 dotenv.config();
 
 const app = express();
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-    apiVersion: '2025-01-27' as any,
-});
 
 const allowedOrigins = [
   'http://localhost:5173',
@@ -407,71 +403,22 @@ app.post('/api/end-consultation', authenticateToken, authorizeDoctor, async (req
     const doctor = docResults[0];
     if (!doctor) return res.status(404).json({ error: 'Dados do médico não encontrados.' });
 
-    // Generate PDF
-    const doc = new PDFDocument({ margins: { top: 40, left: 60, right: 60, bottom: 40 }, size: 'A4' });
+    // Generate PDF using PDFTemplate
+    const template = new PDFTemplate();
+    const doc = template.getDocument();
     const buffers: Buffer[] = [];
     doc.on('data', buffers.push.bind(buffers));
 
-    const primaryTeal = '#004e66';
-    const highlightTeal = '#0097b2';
-    const cleanGreen = '#22c55e';
-    const darkGrey = '#1e293b';
+    template.drawLayout('Resumo da Consulta', doctor.name, doctor.crm);
+    
+    let content = `Paciente: ${patient.name.toUpperCase()}\nCPF: ${patient.cpf}\n\n`;
+    content += `Motivo da Consulta:\n${patient.complaint}\n\n`;
+    content += `Anamnese e Evolução:\n${notes}\n\n`;
+    content += `Prescrição de Conduta:\n${prescriptions}\n\n`;
+    content += `Exames Solicitados:\n${exams}`;
 
-    // HEADER - CENTERED LOGO (NO OVERLAP)
-    const logoY = 40;
-    doc.fontSize(26).font('Helvetica-Bold');
-    const widthMed = doc.widthOfString('MedPronto');
-    const widthOn = doc.widthOfString('Online');
-    const startX = (doc.page.width - (widthMed + widthOn)) / 2;
-
-    doc.fillColor(primaryTeal).text('MedPronto', startX, logoY, { continued: true });
-    doc.fillColor(highlightTeal).text('Online', { continued: false });
-
-    doc.fillColor('#64748b').fontSize(9).font('Helvetica').text('REGISTRO DE ATENDIMENTO MÉDICO (PRONTUÁRIO)', 0, 85, { align: 'center', characterSpacing: 1 });
-    doc.strokeColor(highlightTeal).lineWidth(1.5).moveTo(60, 115).lineTo(535, 115).stroke();
-
-    // TITLE
-    doc.fillColor(darkGrey).fontSize(20).font('Helvetica-Bold').text('RESUMO DA CONSULTA', 0, 160, { align: 'center' });
-
-    // PATIENT INFO
-    doc.moveDown(2);
-    doc.fillColor(primaryTeal).fontSize(12).font('Helvetica-Bold').text('Paciente: ', 60, 210);
-    doc.fillColor('#000').font('Helvetica').text(patient.name.toUpperCase(), 125, 210);
-    doc.strokeColor('#cbd5e1').lineWidth(0.5).moveTo(125, 224).lineTo(535, 224).stroke();
-
-    // CONTENT SECTIONS
-    let currentY = 260;
-    const drawDivider = (y: number) => {
-      doc.strokeColor('#e2e8f0').lineWidth(0.5).moveTo(60, y).lineTo(535, y).stroke();
-    };
-
-    const addSection = (title: string, content: string) => {
-      if (!content) return;
-      doc.fillColor(primaryTeal).fontSize(10).font('Helvetica-Bold').text(title.toUpperCase(), 60, currentY);
-      doc.fillColor(darkGrey).fontSize(11).font('Helvetica').text(content, 60, currentY + 15, { width: 475, align: 'justify', lineGap: 3 });
-      currentY = doc.y + 25;
-      drawDivider(currentY - 10);
-    };
-
-    addSection('Motivo da Consulta', patient.complaint);
-    addSection('Anamnese e Evolução', notes);
-    addSection('Prescrição de Conduta', prescriptions);
-    addSection('Exames Solicitados', exams);
-
-    // SIGNATURE AREA
-    const signatureY = currentY + 40 > 650 ? 650 : currentY + 40;
-    doc.strokeColor('#000').lineWidth(0.5).moveTo(200, signatureY).lineTo(400, signatureY).stroke();
-    doc.fontSize(11).font('Helvetica-Bold').text(`Dr(a). ${doctor.name}`, 0, signatureY + 8, { align: 'center' });
-    doc.fontSize(10).font('Helvetica').text(`CRM: ${doctor.crm}`, 0, signatureY + 22, { align: 'center' });
-
-    // FOOTER
-    const footerY = 740;
-    doc.fillColor(cleanGreen).rect(200, footerY, 200, 25).fill();
-    doc.fillColor('white').fontSize(8).font('Helvetica-Bold').text('ASSINADO DIGITALMENTE - PADRÃO ICP-BRASIL', 200, footerY + 8, { align: 'center', width: 200 });
-
-    doc.fillColor('#94a3b8').fontSize(7).font('Helvetica').text('Este documento é um registro oficial de telemedicina.', 0, footerY + 35, { align: 'center' });
-
-    doc.end();
+    template.addContent(content);
+    template.finalize();
 
     const pdfBuffer = await new Promise<Buffer>((resolve) => {
       doc.on('end', () => resolve(Buffer.concat(buffers)));
@@ -780,52 +727,6 @@ app.get('/api/doctor/signature/status/:sessionId', async (req, res) => {
   }
 });
 
-// --- STRIPE ENDPOINTS ---
-
-app.post('/api/payment/create-checkout', async (req, res) => {
-    console.log("💰 [Stripe] Iniciando checkout session...");
-    try {
-        const session = await stripe.checkout.sessions.create({
-            payment_method_types: ['card', 'pix'],
-            payment_method_options: {
-                pix: {
-                    expires_after_seconds: 1800 // 30 minutos para pagar
-                }
-            },
-            line_items: [{
-                price_data: {
-                    currency: 'brl',
-                    product_data: {
-                        name: 'Consulta Médica - MedPronto',
-                        description: 'Acesso ao atendimento médico online imediato.',
-                    },
-                    unit_amount: 5000, // R$ 50,00
-                },
-                quantity: 1,
-            }],
-            mode: 'payment',
-            success_url: `${req.headers.origin}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${req.headers.origin}/patient/login`,
-        });
-        res.json({ url: session.url });
-    } catch (error: any) {
-        console.error("Stripe Error:", error);
-        res.status(500).json({ error: error.message });
-    }
-});
-
-app.get('/api/payment/verify-session/:sessionId', async (req, res) => {
-    try {
-        const session = await stripe.checkout.sessions.retrieve(req.params.sessionId);
-        if (session.payment_status === 'paid') {
-            res.json({ success: true });
-        } else {
-            res.json({ success: false, status: session.payment_status });
-        }
-    } catch (error: any) {
-        res.status(500).json({ error: error.message });
-    }
-});
 
 // Catch-all 404 handler for debugging (MUST BE AFTER ROUTES)
 app.use((req, res) => {

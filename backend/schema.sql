@@ -8,6 +8,9 @@ CREATE TABLE IF NOT EXISTS patients (
     age TEXT,
     email TEXT,
     birth_date TEXT,
+    stripe_customer_id TEXT,
+    subscription_id TEXT,
+    subscription_status TEXT DEFAULT 'inactive',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
