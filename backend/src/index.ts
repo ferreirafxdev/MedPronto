@@ -451,21 +451,20 @@ app.post('/api/end-consultation', authenticateToken, authorizeDoctor, async (req
     const doctor = docResults[0];
     if (!doctor) return res.status(404).json({ error: 'Dados do médico não encontrados.' });
 
-    // Generate PDF using PDFTemplate
     const template = new PDFTemplate();
     const doc = template.getDocument();
     const buffers: Buffer[] = [];
     doc.on('data', buffers.push.bind(buffers));
 
-    template.drawLayout('Resumo da Consulta', doctor.name, doctor.crm);
+    template.drawLayout('Resumo da Consulta de Telemedicina', doctor.name, doctor.crm);
     
-    let content = `Paciente: ${patient.name.toUpperCase()}\nCPF: ${patient.cpf}\n\n`;
-    content += `Motivo da Consulta:\n${patient.complaint}\n\n`;
-    content += `Anamnese e Evolução:\n${notes}\n\n`;
-    content += `Prescrição de Conduta:\n${prescriptions}\n\n`;
-    content += `Exames Solicitados:\n${exams}`;
+    template.addContent(`PACIENTE: ${patient.name.toUpperCase()}\nCPF: ${patient.cpf}\nDATA: ${new Date().toLocaleDateString('pt-BR')}`);
+    
+    template.addSection('Motivo da Consulta', patient.complaint);
+    template.addSection('Anamnese e Evolução', notes);
+    template.addSection('Prescrição de Conduta', prescriptions);
+    if (exams) template.addSection('Exames Solicitados', exams);
 
-    template.addContent(content);
     template.finalize();
 
     const pdfBuffer = await new Promise<Buffer>((resolve) => {
@@ -546,16 +545,10 @@ app.post('/api/atestado', authenticateToken, authorizeDoctor, async (req, res) =
 
     template.drawLayout('Atestado Médico', doctor.name, doctor.crm);
     
-      summary: {
-        totalConsultations: consultations.length,
-        totalAtestados: atestados.length,
-        lastVisit: consultations.length > 0 ? consultations[0].created_at : null,
-      }
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
+    const atestadoContent = `Atesto para os devidos fins que o(a) Sr(a). ${patient.name}, portador(a) do CPF ${patient.cpf}, foi atendido(a) em consulta médica nesta data, devendo permanecer em repouso por um período de ${days} dia(s) a partir desta data.\n\nCID: ${cid || 'Não informado'}\nCódigo de Validação: ${validationCode}`;
+
+    template.addSection('Declaração de Comparecimento / Repouso', atestadoContent);
+    template.finalize();
 
 
 // 6. Generate Signed URL for S3 Documents

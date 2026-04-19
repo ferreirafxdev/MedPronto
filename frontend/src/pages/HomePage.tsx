@@ -60,7 +60,7 @@ const HomePage = () => {
         <div className="hero-image-wrapper" style={{ flex: '1.2' }}>
           <div className="premium-card" style={{ padding: 0, overflow: 'hidden', height: '550px', borderRadius: 'var(--radius-2xl)' }}>
             <img 
-              src="/hero_doctor_ultra_realistic_1776640344299.png" 
+              src="/hero_doctor.png" 
               alt="Médico Realista MedPronto" 
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />

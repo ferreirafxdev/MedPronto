@@ -6,14 +6,14 @@ export class PDFTemplate {
     private secondaryColor = '#0f172a'; // Slate-900
 
     constructor() {
-        // ABNT Margins: Top/Left 3cm (85pt), Bottom/Right 2cm (57pt)
+        // Optimized margins to save space
         this.doc = new PDFDocument({
             size: 'A4',
             margins: {
-                top: 85,
-                left: 85,
-                bottom: 57,
-                right: 57
+                top: 50,    // Reduced from 85
+                left: 60,   // Reduced from 85
+                bottom: 40, // Reduced from 57
+                right: 60   // Reduced from 57
             }
         });
     }
@@ -29,9 +29,9 @@ export class PDFTemplate {
     }
 
     private drawHeader() {
-        // Geometric Logo - Adjusted for 3cm margin
+        // Geometric Logo
         this.doc.save();
-        this.doc.translate(85, 40); // Within the 3cm top margin
+        this.doc.translate(60, 25); 
         this.doc.path('M0 0 L15 0 L18 8 L15 16 L0 16 Z').fill(this.primaryColor);
         this.doc.path('M8 -4 L23 -4 L26 4 L23 12 L8 12 Z').fill(this.secondaryColor);
         this.doc.restore();
@@ -40,23 +40,23 @@ export class PDFTemplate {
         this.doc.fillColor(this.secondaryColor)
             .fontSize(16)
             .font('Helvetica-Bold')
-            .text('MedPronto', 120, 40);
+            .text('MedPronto', 95, 25);
         
         this.doc.fontSize(8)
             .font('Helvetica')
             .fillColor('#64748b')
-            .text('Plataforma de Saúde Digital', 120, 58);
+            .text('Plataforma de Saúde Digital', 95, 43);
 
         // Contact Info (Right aligned)
-        const rightPos = this.doc.page.width - 57;
+        const rightPos = this.doc.page.width - 60;
         this.doc.fontSize(8)
             .fillColor('#64748b')
-            .text('contato@medpronto.com.br', 350, 40, { align: 'right', width: rightPos - 350 })
-            .text('São Paulo - SP', 350, 50, { align: 'right', width: rightPos - 350 });
+            .text('contato@medpronto.com.br', 350, 25, { align: 'right', width: rightPos - 350 })
+            .text('São Paulo - SP', 350, 35, { align: 'right', width: rightPos - 350 });
 
         // Divider Line
-        this.doc.moveTo(85, 80)
-            .lineTo(rightPos, 80)
+        this.doc.moveTo(60, 65)
+            .lineTo(rightPos, 65)
             .lineWidth(1)
             .strokeColor(this.primaryColor)
             .stroke();
@@ -98,16 +98,26 @@ export class PDFTemplate {
     }
 
     addContent(content: string) {
-        // ABNT: Font Size 12, Spacing 1.5 (lineGap ~ 6pt)
-        this.doc.fontSize(12)
+        // Reduced gap to ensure all info fits on one page
+        this.doc.moveDown(0.5);
+        this.doc.fontSize(10) // Small font for body
             .font('Helvetica')
             .fillColor(this.secondaryColor)
             .text(content, {
                 align: 'justify',
-                lineGap: 6,
-                paragraphGap: 10,
-                indent: 35.4 // Indentation: 1.25cm
+                lineGap: 2, // Much tighter spacing
+                paragraphGap: 6
             });
+    }
+
+    addSection(title: string, content: string) {
+        this.doc.moveDown(0.8);
+        this.doc.fontSize(10).font('Helvetica-Bold').fillColor(this.primaryColor).text(title.toUpperCase());
+        this.doc.moveDown(0.2);
+        this.doc.fontSize(10).font('Helvetica').fillColor(this.secondaryColor).text(content, {
+            align: 'justify',
+            lineGap: 1.5
+        });
     }
 
     finalize() {
