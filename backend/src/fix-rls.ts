@@ -1,6 +1,7 @@
 import { Client } from 'pg';
+import { config } from './config';
 
-const connectionString = 'postgresql://postgres:postgresadmin@db.xpbyihsyblghajbcvudb.supabase.co:5432/postgres';
+const connectionString = config.databaseUrl;
 
 const fixRls = async () => {
   const client = new Client({ connectionString });

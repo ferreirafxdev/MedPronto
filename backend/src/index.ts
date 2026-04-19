@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { Server } from 'socket.io';
 import { createServer } from 'http';
 import dotenv from 'dotenv';
@@ -32,6 +34,7 @@ const allowedOrigins = [
   /\.vercel\.app$/
 ];
 
+app.use(helmet()); // Adiciona cabeçalhos de segurança básicos
 app.use(cors({
   origin: allowedOrigins,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -41,6 +44,15 @@ app.use(cors({
   optionsSuccessStatus: 204
 }));
 app.use(express.json());
+
+// Configuração de Rate Limit para prevenir ataques de força bruta
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 20, // Limite de 20 tentativas por IP por janela
+  message: { error: 'Muitas tentativas de login. Tente novamente em 15 minutos.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Logger de requisições
 app.use((req, res, next) => {
@@ -139,7 +151,7 @@ const authorizeDoctor = (req: any, res: any, next: any) => {
 // -- API Routes --
 
 // 0. AUTHENTICATION (SUPABASE REAL DATA)
-app.post('/api/patient/auth', async (req, res) => {
+app.post('/api/patient/auth', authLimiter, async (req, res) => {
   try {
     const { cpf, birthDate } = req.body;
     // Query Neon for real patient
@@ -162,7 +174,7 @@ app.post('/api/patient/auth', async (req, res) => {
   }
 });
 
-app.post('/api/patient/register', async (req, res) => {
+app.post('/api/patient/register', authLimiter, async (req, res) => {
   console.log('📝 Recebendo registro de paciente:', req.body?.name);
   try {
     const { name, cpf, age, email, birthDate } = req.body;
@@ -181,7 +193,7 @@ app.post('/api/patient/register', async (req, res) => {
   }
 });
 
-app.post('/api/doctor/auth', async (req, res) => {
+app.post('/api/doctor/auth', authLimiter, async (req, res) => {
   try {
     const { login, password } = req.body; // login can be CRM or Email
     // Query Neon for real doctor
@@ -245,7 +257,7 @@ app.get('/api/admin/stats', authenticateToken, authorizeAdmin, async (req, res) 
   }
 });
 
-app.post('/api/admin/doctors', authenticateToken, authorizeAdmin, async (req, res) => {
+app.post('/api/admin/doctors', authenticateToken, authorizeAdmin, authLimiter, async (req, res) => {
   try {
     const { name, crm, email, password } = req.body;
     const hashedPassword = await bcrypt.hash(password, 10);

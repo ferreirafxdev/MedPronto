@@ -1,11 +1,7 @@
 import postgres from 'postgres';
-import dotenv from 'dotenv';
-import path from 'path';
+import { config } from './config';
 
-// Load env from backend folder
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
-
-const DATABASE_URL = 'postgresql://postgres:postgresadmin@db.wrltuhhfqaqlrgoiafph.supabase.co:5432/postgres';
+const DATABASE_URL = config.databaseUrl;
 
 async function migrate() {
     console.log('🚀 Iniciando migração da tabela de fila...');
