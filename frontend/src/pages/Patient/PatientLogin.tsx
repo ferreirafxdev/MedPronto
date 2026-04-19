@@ -108,8 +108,8 @@ const PatientLogin = () => {
   };
 
   return (
-    <div className="auth-container" style={{ background: 'linear-gradient(135deg, var(--bg-base) 0%, #ffffff 100%)' }}>
-      <div className="glass-card" style={{ maxWidth: '540px', padding: '3rem' }}>
+    <div className="auth-container" style={{ background: 'var(--bg-base)', position: 'relative' }}>
+      <div className="premium-card animate-fade-in" style={{ maxWidth: '540px', padding: '3.5rem 3rem' }}>
         
         {/* HEADER */}
         <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
@@ -134,16 +134,16 @@ const PatientLogin = () => {
           {!isLogin ? (
             <>
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <User size={14} /> Nome Completo
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--navy-light)' }}>
+                  <User size={14} color="var(--accent)" /> Nome Completo
                 </label>
-                <input required name="name" value={formData.name} onChange={handleChange} className="form-control" placeholder="Ex: João Silva" />
+                <input required name="name" value={formData.name} onChange={handleChange} className="form-control" placeholder="Eentre seu nome completo" />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '1rem' }}>
                 <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <Hash size={14} /> CPF
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--navy-light)' }}>
+                    <Hash size={14} color="var(--accent)" /> CPF
                   </label>
                   <input required name="cpf" value={formData.cpf} onChange={handleChange} className="form-control" placeholder="000.000.000-00" />
                 </div>
@@ -192,7 +192,7 @@ const PatientLogin = () => {
             </div>
           )}
 
-          <button type="submit" className="btn btn-primary btn-full btn-lg" style={{ marginTop: '0.5rem', boxShadow: '0 8px 20px rgba(var(--accent-rgb), 0.25)' }} disabled={loading}>
+          <button type="submit" className="btn btn-primary btn-full btn-lg" style={{ marginTop: '1rem' }} disabled={loading}>
             {loading ? <Loader2 size={20} className="animate-spin" /> : (
               <span style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                 {isLogin ? 'Entrar no Painel' : 'Concluir e Entrar na Fila'}

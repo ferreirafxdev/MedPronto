@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../../store/useStore';
 import { useNavigate } from 'react-router-dom';
-import { Users, Database, TrendingUp, ArrowUpDown, ExternalLink, RefreshCw, BarChart3, FileText } from 'lucide-react';
+import { Users, Database, TrendingUp, ArrowUpDown, ExternalLink, RefreshCw, BarChart3, FileText, FileUser, Search } from 'lucide-react';
 import apiClient from '../../api/client';
 import { io } from 'socket.io-client';
 import { openDocument } from '../../utils/s3';
@@ -15,6 +15,8 @@ const AdminDashboard = () => {
     const [doctors, setDoctors] = useState<any[]>([]);
     const [patients, setPatients] = useState<any[]>([]);
     const [consultations, setConsultations] = useState<any[]>([]);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [expandedConsultation, setExpandedConsultation] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -171,18 +173,83 @@ const AdminDashboard = () => {
 
                     {activeTab === 'prontuarios' && (
                         <div>
-                            <h3 style={{ margin: '0 0 1rem 0', fontSize: '1.05rem' }}>Histórico de Teleconsultas</h3>
-                            {consultations.map(c => (
-                                <div key={c.id} className="queue-item" style={{ cursor: 'default' }}>
-                                    <div>
-                                        <strong style={{ fontSize: '0.88rem', color: 'var(--text-heading)' }}>{c.patient_name || 'Paciente'}</strong>
-                                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Por: {c.doctor_name || 'Médico'} • {new Date(c.created_at).toLocaleString('pt-BR')}</div>
-                                    </div>
-                                    <button className="btn btn-outline btn-sm" onClick={() => openDocument(c.pdf_path)} style={{ gap: '0.25rem' }}>
-                                        <ExternalLink size={11} /> PDF
-                                    </button>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                                <h3 style={{ margin: 0, fontSize: '1.05rem' }}>Histórico de Teleconsultas</h3>
+                                <div style={{ position: 'relative', width: '250px' }}>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Buscar por paciente ou médico..." 
+                                        className="form-control" 
+                                        style={{ paddingRight: '2.5rem', fontSize: '0.8rem' }}
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                    />
                                 </div>
-                            ))}
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                                {consultations
+                                    .filter(c => 
+                                        (c.patient_name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+                                        (c.doctor_name || '').toLowerCase().includes(searchTerm.toLowerCase())
+                                    )
+                                    .map(c => (
+                                    <div key={c.id} className="premium-card" style={{ 
+                                        padding: '1.25rem', 
+                                        cursor: 'pointer',
+                                        background: expandedConsultation === c.id ? 'var(--accent-ultra-light)' : 'white'
+                                    }} onClick={() => setExpandedConsultation(expandedConsultation === c.id ? null : c.id)}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                                <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--accent-ultra-light)', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                    <FileUser size={20} />
+                                                </div>
+                                                <div>
+                                                    <strong style={{ display: 'block', fontSize: '0.95rem', color: 'var(--text-heading)' }}>{c.patient_name || 'Paciente'}</strong>
+                                                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Médico: {c.doctor_name} • CRM {c.doctor_crm || 'N/A'}</span>
+                                                </div>
+                                            </div>
+                                            <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                                    {new Date(c.created_at).toLocaleDateString('pt-BR')} <br/>
+                                                    {new Date(c.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                                </div>
+                                                <button className="btn btn-outline btn-sm" onClick={(e) => { e.stopPropagation(); openDocument(c.pdf_path); }}>
+                                                    <ExternalLink size={12} /> PDF
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {expandedConsultation === c.id && (
+                                            <div className="animate-fade-in" style={{ marginTop: '1.25rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                                                <div>
+                                                    <h5 style={{ fontSize: '0.75rem', color: 'var(--accent)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Queixa & Notas</h5>
+                                                    <p style={{ fontSize: '0.85rem', color: 'var(--text-body)', background: 'white', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                                                        {c.notes || 'Nenhuma nota detalhada.'}
+                                                    </p>
+                                                </div>
+                                                <div>
+                                                    <h5 style={{ fontSize: '0.75rem', color: 'var(--violet)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Conduta & Receitas</h5>
+                                                    <div style={{ fontSize: '0.85rem', color: 'var(--text-body)', background: 'white', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', minHeight: '60px' }}>
+                                                        {c.prescriptions || 'Nenhuma prescrição registrada.'}
+                                                    </div>
+                                                    <div style={{ marginTop: '0.75rem' }}>
+                                                        <h5 style={{ fontSize: '0.75rem', color: 'var(--amber)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>Exames Solicitados</h5>
+                                                        <div style={{ fontSize: '0.85rem', color: 'var(--text-body)', background: 'white', padding: '0.75rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+                                                            {c.exams || 'Nenhum exame solicitado.'}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                                {consultations.length === 0 && (
+                                    <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                                        Nenhum prontuário encontrado.
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     )}
                 </main>

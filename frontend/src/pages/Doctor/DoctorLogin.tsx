@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
-import { Stethoscope, User as UserIcon, Lock, Loader2 } from 'lucide-react';
+import { Stethoscope, User as UserIcon, Lock, Loader2, ArrowRight } from 'lucide-react';
 import apiClient from '../../api/client';
 
 const DoctorLogin = () => {
@@ -40,8 +40,8 @@ const DoctorLogin = () => {
   };
 
   return (
-    <div className="auth-container">
-      <div className="glass-card">
+    <div className="auth-container" style={{ background: 'var(--bg-base)' }}>
+      <div className="premium-card animate-fade-in" style={{ maxWidth: '440px', padding: '3.5rem 2.5rem' }}>
         <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
           <div className="icon-wrapper" style={{ background: 'var(--mint-light)', margin: '0 auto 0.85rem auto' }}>
             <Stethoscope size={26} color="var(--mint)" />
@@ -64,8 +64,12 @@ const DoctorLogin = () => {
               <input required name="password" type="password" className="form-control" placeholder="••••••••" style={{ paddingLeft: '2.3rem' }} />
             </div>
           </div>
-          <button type="submit" className="btn btn-primary btn-full" style={{ marginTop: '0.75rem', height: '44px' }} disabled={loading}>
-            {loading ? <Loader2 size={18} className="animate-spin" /> : 'Acessar Sistema'}
+          <button type="submit" className="btn btn-primary btn-full btn-lg" style={{ marginTop: '0.75rem' }} disabled={loading}>
+            {loading ? <Loader2 size={18} className="animate-spin" /> : (
+              <span style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                Acessar Sistema <ArrowRight size={18} />
+              </span>
+            )}
           </button>
         </form>
       </div>
