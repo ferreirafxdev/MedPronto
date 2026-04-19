@@ -10,7 +10,7 @@ import PatientConsultationRoom from './pages/Patient/PatientConsultationRoom';
 import PatientProfile from './pages/Patient/PatientProfile';
 import PatientPayment from './pages/Patient/PatientPayment';
 import HomePage from './pages/HomePage';
-import VerifyAtestado from './pages/VerifyAtestado';
+import VerifyDocument from './pages/VerifyDocument';
 import Header from './components/Header';
 import './index.css';
 
@@ -38,7 +38,7 @@ function App() {
             <Route path="/doctor/login" element={<DoctorLogin />} />
             <Route path="/doctor/dashboard" element={<DoctorDashboard />} />
             <Route path="/doctor/consultation/:roomId" element={<ConsultationRoom />} />
-            <Route path="/validar" element={<VerifyAtestado />} />
+            <Route path="/validar" element={<VerifyDocument />} />
           </Routes>
         </main>
       </div>

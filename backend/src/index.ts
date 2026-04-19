@@ -451,12 +451,14 @@ app.post('/api/end-consultation', authenticateToken, authorizeDoctor, async (req
     const doctor = docResults[0];
     if (!doctor) return res.status(404).json({ error: 'Dados do médico não encontrados.' });
 
+     const validationCode = `MP-R-${uuidv4().substring(0, 8).toUpperCase()}`;
+
     const template = new PDFTemplate();
     const doc = template.getDocument();
     const buffers: Buffer[] = [];
     doc.on('data', buffers.push.bind(buffers));
 
-    template.drawLayout('Resumo da Consulta de Telemedicina', doctor.name, doctor.crm);
+    template.drawLayout('Resumo da Consulta de Telemedicina', doctor.name, doctor.crm, validationCode);
     
     template.addContent(`PACIENTE: ${patient.name.toUpperCase()}\nCPF: ${patient.cpf}\nDATA: ${new Date().toLocaleDateString('pt-BR')}`);
     
@@ -491,10 +493,10 @@ app.post('/api/end-consultation', authenticateToken, authorizeDoctor, async (req
       // Fallback or handle error
     }
 
-    // Save metadata in DB
+    // Save metadata in DB with validation code
     await sql`
-        INSERT INTO consultations (patient_id, doctor_id, notes, prescriptions, exams, pdf_path)
-        VALUES (${patient.patient_id}, ${doctorId}, ${notes}, ${prescriptions}, ${exams}, ${pdfUrl})
+        INSERT INTO consultations (patient_id, doctor_id, notes, prescriptions, exams, pdf_path, validation_code)
+        VALUES (${patient.patient_id}, ${doctorId}, ${notes}, ${prescriptions}, ${exams}, ${pdfUrl}, ${validationCode})
     `;
 
     // Finalize: Remove from DB Queue
@@ -543,7 +545,7 @@ app.post('/api/atestado', authenticateToken, authorizeDoctor, async (req, res) =
     const buffers: Buffer[] = [];
     doc.on('data', buffers.push.bind(buffers));
 
-    template.drawLayout('Atestado Médico', doctor.name, doctor.crm);
+    template.drawLayout('Atestado Médico', doctor.name, doctor.crm, validationCode);
     
     const atestadoContent = `Atesto para os devidos fins que o(a) Sr(a). ${patient.name}, portador(a) do CPF ${patient.cpf}, foi atendido(a) em consulta médica nesta data, devendo permanecer em repouso por um período de ${days} dia(s) a partir desta data.\n\nCID: ${cid || 'Não informado'}\nCódigo de Validação: ${validationCode}`;
 
@@ -551,7 +553,68 @@ app.post('/api/atestado', authenticateToken, authorizeDoctor, async (req, res) =
     template.finalize();
 
 
-// 6. Generate Signed URL for S3 Documents
+// 6. Unified Document Validation
+app.get('/api/validate-document/:code', async (req, res) => {
+  try {
+    const { code } = req.params;
+    const cleanCode = code.trim().toUpperCase();
+
+    // 1. Try Atestados
+    const [atestado] = await sql`
+        SELECT a.*, p.name as patient_name, d.name as doctor_name, d.crm as doctor_crm
+        FROM atestados a
+        JOIN patients p ON a.patient_id = p.id
+        JOIN doctors d ON a.doctor_id = d.id
+        WHERE a.code = ${cleanCode}
+        LIMIT 1
+    `;
+
+    if (atestado) {
+      return res.json({ 
+        success: true, 
+        type: 'ATESTADO',
+        document: {
+          patientName: atestado.patient_name,
+          doctorName: atestado.doctor_name,
+          doctorCrm: atestado.doctor_crm,
+          date: atestado.created_at,
+          details: `Atestado de ${atestado.days_off} dia(s). CID: ${atestado.cid || 'N/A'}`
+        }
+      });
+    }
+
+    // 2. Try Consultations (Prescriptions)
+    const [consultation] = await sql`
+        SELECT c.*, p.name as patient_name, d.name as doctor_name, d.crm as doctor_crm
+        FROM consultations c
+        JOIN patients p ON c.patient_id = p.id
+        JOIN doctors d ON c.doctor_id = d.id
+        WHERE c.validation_code = ${cleanCode}
+        LIMIT 1
+    `;
+
+    if (consultation) {
+      return res.json({ 
+        success: true, 
+        type: 'RECEITA / PRONTUÁRIO',
+        document: {
+          patientName: consultation.patient_name,
+          doctorName: consultation.doctor_name,
+          doctorCrm: consultation.doctor_crm,
+          date: consultation.created_at,
+          details: `Prescrições: ${consultation.prescriptions}\nExames: ${consultation.exams || 'Nenhum'}`
+        }
+      });
+    }
+
+    res.status(404).json({ error: 'Documento não encontrado ou código inválido.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// 7. Generate Signed URL for S3 Documents
 app.post('/api/documents/signed-url', authenticateToken, async (req: any, res: any) => {
   try {
     const { key } = req.body;

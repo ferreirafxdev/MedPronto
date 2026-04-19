@@ -22,10 +22,10 @@ export class PDFTemplate {
         return this.doc;
     }
 
-    drawLayout(title: string, doctorName: string, doctorCRM: string) {
+    drawLayout(title: string, doctorName: string, doctorCRM: string, validationCode?: string) {
         this.drawHeader();
         this.drawTitle(title);
-        this.drawFooter(doctorName, doctorCRM);
+        this.drawFooter(doctorName, doctorCRM, validationCode);
     }
 
     private drawHeader() {
@@ -71,8 +71,9 @@ export class PDFTemplate {
         this.doc.moveDown(1);
     }
 
-    private drawFooter(doctorName: string, doctorCRM: string) {
+    private drawFooter(doctorName: string, doctorCRM: string, validationCode?: string) {
         const bottom = this.doc.page.height - 85;
+        const rightPos = this.doc.page.width - 60;
 
         // Signature Area
         this.doc.moveTo(150, bottom)
@@ -91,10 +92,18 @@ export class PDFTemplate {
             .fillColor('#64748b')
             .text(`Registro Profissional: ${doctorCRM}`, 150, bottom + 18, { width: 295, align: 'center' });
 
+        // Validation Info
+        if (validationCode) {
+            this.doc.fontSize(7)
+                .fillColor('#475569')
+                .text(`CÓDIGO DE VALIDAÇÃO: ${validationCode}`, 60, this.doc.page.height - 55, { width: 400, align: 'left' })
+                .text('Para validar este documento, acesse medpronto.com.br/validar e informe o código acima.', 60, this.doc.page.height - 45, { width: 400, align: 'left' });
+        }
+
         // Bottom disclaimer
         this.doc.fontSize(7)
             .fillColor('#cbd5e1')
-            .text('Documento eletrônico validável via QR Code ou no site oficial.', 85, this.doc.page.height - 35, { align: 'center' });
+            .text('Documento eletrônico validável via QR Code ou no site oficial da MedPronto.', 0, this.doc.page.height - 25, { align: 'center', width: this.doc.page.width });
     }
 
     addContent(content: string) {

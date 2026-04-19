@@ -406,12 +406,21 @@ h1, h2, h3, h4, h5, h6 {
   justify-content: center;
 }
 
-/* ===== MAIN CONTENT ===== */
-.main-content {
-  min-height: 100vh;
+/* ===== AUTH & FORM LAYOUTS ===== */
+
+.auth-container {
+  min-height: calc(100vh - 72px); /* Subtract header height */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background: var(--bg-base);
 }
 
-.app-container {
-  width: 100%;
+.dashboard-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 80px 2rem 40px 2rem;
 }
+
 
