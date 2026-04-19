@@ -5,7 +5,10 @@ import { Loader2, HeartPulse, User, Mail, Calendar, Hash, ArrowRight, MessageSqu
 import apiClient from '../../api/client';
 
 const PatientLogin = () => {
-  const [isLogin, setIsLogin] = useState(false);
+  const [searchParams] = useSearchParams();
+  const initialMode = searchParams.get('mode') === 'register';
+  
+  const [isLogin, setIsLogin] = useState(!initialMode);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { setUser } = useStore();
@@ -18,6 +21,13 @@ const PatientLogin = () => {
     birthDate: '',
     complaint: '' 
   });
+
+  useEffect(() => {
+    // If trying to register, check if payment was confirmed
+    if (!isLogin && !localStorage.getItem('payment_confirmed')) {
+      navigate('/patient/payment');
+    }
+  }, [isLogin, navigate]);
 
   const formatCPF = (value: string) => {
     const digits = value.replace(/\D/g, '');
@@ -62,30 +72,34 @@ const PatientLogin = () => {
           birthDate: formData.birthDate 
         });
         if (loginResp.data.success) {
-            const pat = loginResp.data.patient;
+            const { patient: pat, token } = loginResp.data;
             setUser({ 
                 id: pat.id, 
                 name: pat.name, 
                 role: 'patient', 
                 cpf: pat.cpf, 
                 age: pat.age, 
-                email: pat.email
+                email: pat.email,
+                token
             });
             navigate('/patient/dashboard');
         }
       } else {
         const regResp = await apiClient.post('/api/patient/register', formData);
         if (regResp.data.success) {
-            const pat = regResp.data.patient;
+            const { patient: pat, token } = regResp.data;
             setUser({ 
                 id: pat.id, 
                 name: pat.name, 
                 role: 'patient', 
                 cpf: pat.cpf, 
                 age: pat.age, 
-                email: pat.email
+                email: pat.email,
+                token
             });
-            navigate('/patient/dashboard');
+            // Clear payment flag and set just_registered for auto-enqueue
+            localStorage.removeItem('payment_confirmed');
+            navigate('/patient/dashboard?just_registered=true');
         }
       }
     } catch (error: any) {

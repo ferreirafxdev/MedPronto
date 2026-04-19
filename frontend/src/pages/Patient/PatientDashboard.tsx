@@ -1,32 +1,56 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
-import { Loader2, Activity, Clock, Wifi, Video, FileText, AlertCircle, ExternalLink } from 'lucide-react';
+import { Loader2, Activity, Clock, Wifi, Video, FileText, AlertCircle, ExternalLink, BadgeAlert } from 'lucide-react';
 import { io } from 'socket.io-client';
 import apiClient from '../../api/client';
+import { openDocument } from '../../utils/s3';
 
 const PatientDashboard = () => {
   const { user, setConsultationRoomId } = useStore();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [inQueue, setInQueue] = useState(false);
   const [consultationReady, setConsultationReady] = useState(false);
   const [roomData, setRoomData] = useState<{ roomId: string, doctorId: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [complaint, setComplaint] = useState('');
-  const [showPixModal, setShowPixModal] = useState(false);
-  const [pixKey, setPixKey] = useState('');
+
+  const handleEnqueue = useCallback(async (customComplaint?: string) => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const resp = await apiClient.post('/api/enqueue', {
+        ...user,
+        complaint: customComplaint || complaint
+      });
+      if (resp.data.success) {
+        setInQueue(true);
+      }
+    } catch (e) {
+      console.error("Erro ao entrar na fila");
+    } finally {
+      setLoading(false);
+    }
+  }, [user, complaint]);
 
   useEffect(() => {
     if (!user) { navigate('/patient/login'); return; }
 
-    // Check initial status
     const checkStatus = async () => {
       try {
         const resp = await apiClient.get(`/api/patient/check-queue/${user.id}`);
-        if (resp.data.inQueue) setInQueue(true);
+        if (resp.data.inQueue) {
+          setInQueue(true);
+          setLoading(false);
+        } else if (searchParams.get('just_registered') === 'true') {
+          // AUTO-ENQUEUE for new registrations
+          await handleEnqueue();
+        } else {
+          setLoading(false);
+        }
       } catch (e) {
         console.error("Erro ao verificar status da fila");
-      } finally {
         setLoading(false);
       }
     };
@@ -42,49 +66,16 @@ const PatientDashboard = () => {
       setInQueue(false);
     });
 
+
     s.on('consultation_ended', (data) => {
-      if (data?.pdf_url) window.open(data.pdf_url, '_blank');
+      if (data?.pdf_url) openDocument(data.pdf_url);
       alert("Sua consulta terminou. Seu prontuário foi salvo.");
       setInQueue(false);
       setConsultationReady(false);
     });
 
     return () => { s.disconnect(); };
-  }, [user, navigate]);
-
-  const handleShowPayment = async () => {
-    if (!complaint.trim()) return alert("Por favor, descreva o que está sentindo.");
-    setLoading(true);
-    try {
-      const resp = await apiClient.post('/api/payment/pix-simulate', { patientId: user?.id });
-      if (resp.data.success) {
-        setPixKey(resp.data.pixKey);
-        setShowPixModal(true);
-      }
-    } catch (e) {
-      alert("Erro ao gerar PIX. Tente novamente.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleEnqueue = async () => {
-    setLoading(true);
-    try {
-      const resp = await apiClient.post('/api/enqueue', {
-        ...user,
-        complaint
-      });
-      if (resp.data.success) {
-        setInQueue(true);
-        setShowPixModal(false);
-      }
-    } catch (e) {
-      alert("Erro ao entrar na fila. Tente novamente.");
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [user, navigate, searchParams, handleEnqueue]);
 
   const enterRoom = () => {
     if (roomData) {
@@ -96,6 +87,7 @@ const PatientDashboard = () => {
   if (!user || loading) return (
     <div className="auth-container">
       <Loader2 size={32} className="animate-spin" color="var(--accent)" />
+      <span style={{ marginLeft: '1rem', color: 'var(--text-muted)' }}>Configurando seu atendimento...</span>
     </div>
   );
 
@@ -108,7 +100,7 @@ const PatientDashboard = () => {
         </div>
       </div>
 
-      {/* NOT IN QUEUE AND NOT IN CONSULTATION */}
+      {/* NOT IN QUEUE AND NOT IN CONSULTATION (Show Call to Action for Existing Users) */}
       {!inQueue && !consultationReady && (
         <div style={{ background: 'var(--bg-white)', padding: '2rem', borderRadius: 'var(--radius-xl)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-md)', animation: 'fadeInUp 0.5s ease' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', marginBottom: '1.25rem' }}>
@@ -116,53 +108,14 @@ const PatientDashboard = () => {
               <Activity size={24} color="var(--accent)" />
             </div>
             <div>
-              <h3 style={{ margin: 0, fontSize: '1.15rem' }}>Pronto para sua consulta?</h3>
-              <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.85rem' }}>Entre na fila virtual para falar com um médico agora.</p>
+              <h3 style={{ margin: 0, fontSize: '1.15rem' }}>Deseja iniciar um novo atendimento?</h3>
+              <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.85rem' }}>Você será redirecionado para o pagamento antes de entrar na fila.</p>
             </div>
           </div>
 
-          <div className="form-group">
-            <label>O que você está sentindo?</label>
-            <textarea
-              className="form-control"
-              placeholder="Descreva seus sintomas brevemente..."
-              value={complaint}
-              onChange={(e) => setComplaint(e.target.value)}
-              rows={3}
-            />
-          </div>
-          <button className="btn btn-primary btn-full btn-lg" onClick={handleShowPayment} disabled={loading}>
-            {loading ? <Loader2 size={18} className="animate-spin" /> : 'Realizar Pagamento (R$ 50,00)'}
+          <button className="btn btn-primary btn-full btn-lg" onClick={() => navigate('/patient/payment')}>
+            Solicitar Nova Consulta (R$ 50,00)
           </button>
-        </div>
-      )}
-
-      {/* PIX MODAL (SIMULATED) */}
-      {showPixModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem' }}>
-          <div style={{ background: 'var(--bg-white)', width: '100%', maxWidth: '420px', borderRadius: 'var(--radius-xl)', padding: '2rem', boxShadow: 'var(--shadow-lg)', animation: 'fadeInUp 0.3s ease' }}>
-            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-              <div style={{ width: '64px', height: '64px', background: 'var(--accent-ultra-light)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
-                <Wifi size={32} color="var(--accent)" />
-              </div>
-              <h3 style={{ fontSize: '1.4rem', marginBottom: '0.4rem' }}>Pagamento PIX</h3>
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Valor da Consulta: <strong>R$ 50,00</strong></p>
-            </div>
-
-            <div style={{ background: 'var(--bg-subtle)', padding: '1.5rem', borderRadius: 'var(--radius-lg)', border: '1px dashed var(--accent)', textAlign: 'center', marginBottom: '1.5rem' }}>
-               <img src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(pixKey)}`} alt="PIX QR Code" style={{ marginBottom: '1rem', mixBlendMode: 'multiply' }} />
-               <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>COPIE A CHAVE ABAIXO:</div>
-               <code style={{ display: 'block', wordBreak: 'break-all', fontSize: '0.65rem', background: 'white', padding: '0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>{pixKey.substring(0, 60)}...</code>
-            </div>
-
-            <div style={{ display: 'grid', gap: '0.75rem' }}>
-              <button className="btn btn-primary btn-full btn-lg" onClick={handleEnqueue} disabled={loading}>
-                {loading ? <Loader2 size={18} className="animate-spin" /> : 'Paguei (Entrar na Fila)'}
-              </button>
-              <button className="btn btn-outline btn-full" onClick={() => setShowPixModal(false)}>Cancelar</button>
-            </div>
-            <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textAlign: 'center', marginTop: '1rem' }}>O acesso à fila é liberado automaticamente após a confirmação.</p>
-          </div>
         </div>
       )}
 

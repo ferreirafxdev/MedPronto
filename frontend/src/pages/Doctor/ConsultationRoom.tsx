@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { io } from 'socket.io-client';
 import apiClient from '../../api/client';
+import { openDocument } from '../../utils/s3';
 import { CheckCircle, Edit3, ClipboardList, PenTool, FileText, Download, Send, ShieldCheck } from 'lucide-react';
 // Mirotalk WebRTC Integration - Replacing Jitsi
 
@@ -92,7 +93,7 @@ const ConsultationRoom = () => {
       setLoading(true);
       try {
         const r = await apiClient.post('/api/end-consultation', { patientId: roomId, doctorId: user?.id, notes, prescriptions, exams });
-        if(r.data.pdf_url) window.open(r.data.pdf_url, '_blank');
+        if(r.data.pdf_url) openDocument(r.data.pdf_url);
         alert("✅ Atendimento finalizado!"); navigate('/doctor/dashboard');
       } catch(err) { alert("Erro ao encerrar."); } finally { setLoading(false); }
     }

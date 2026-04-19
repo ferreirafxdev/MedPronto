@@ -12,11 +12,11 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        value: postgresql://postgres:postgresadmin@db.wrltuhhfqaqlrgoiafph.supabase.co:5432/postgres
+        value: ${DATABASE_URL}
       - key: SUPABASE_URL
-        value: https://wrltuhhfqaqlrgoiafph.supabase.co
+        value: ${SUPABASE_URL}
       - key: SUPABASE_KEY
-        value: sb_publishable_KLL387pq4FBIC84iuMtx5g_f_y531_d
+        value: ${SUPABASE_KEY}
       - key: JWT_SECRET
         generateValue: true
       - key: ADMIN_PASSWORD
@@ -24,12 +24,12 @@ services:
       - key: CORS_ORIGIN
         value: https://medpronto-online.vercel.app
       - key: S3_ENDPOINT
-        value: https://wrltuhhfqaqlrgoiafph.storage.supabase.co/storage/v1/s3
+        value: ${S3_ENDPOINT}
       - key: S3_REGION
         value: us-east-2
       - key: S3_ACCESS_KEY
-        value: 66952d348a5fb2b8737ad7a0f787b73c
+        value: ${S3_ACCESS_KEY}
       - key: S3_SECRET_KEY
-        value: 7a62526c33c46b45d5a309915d836f76e0d0eee535f6c0d92506e55e2eae15fd
+        value: ${S3_SECRET_KEY}
       - key: S3_BUCKET
         value: s3

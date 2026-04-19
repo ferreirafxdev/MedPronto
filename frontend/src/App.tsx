@@ -8,6 +8,7 @@ import DoctorDashboard from './pages/Doctor/DoctorDashboard';
 import ConsultationRoom from './pages/Doctor/ConsultationRoom';
 import PatientConsultationRoom from './pages/Patient/PatientConsultationRoom';
 import PatientProfile from './pages/Patient/PatientProfile';
+import PatientPayment from './pages/Patient/PatientPayment';
 import HomePage from './pages/HomePage';
 import VerifyAtestado from './pages/VerifyAtestado';
 import Header from './components/Header';
@@ -27,6 +28,7 @@ function App() {
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
 
             {/* Patient Routes */}
+            <Route path="/patient/payment" element={<PatientPayment />} />
             <Route path="/patient/login" element={<PatientLogin />} />
             <Route path="/patient/dashboard" element={<PatientDashboard />} />
             <Route path="/patient/consultation/:roomId" element={<PatientConsultationRoom />} />

@@ -7,6 +7,7 @@ import {
   Clock, ClipboardList 
 } from 'lucide-react';
 import apiClient from '../../api/client';
+import { openDocument } from '../../utils/s3';
 
 interface Consultation {
   id: string;
@@ -228,7 +229,7 @@ const PatientProfile = () => {
                             <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Receita</span>
                           </div>
                           {c.receita_pdf_url && (
-                             <button className="btn btn-sm" onClick={() => window.open(c.receita_pdf_url, '_blank')} 
+                             <button className="btn btn-sm" onClick={() => openDocument(c.receita_pdf_url)} 
                                style={{ background: 'var(--accent-ultra-light)', color: 'var(--accent)', border: 'none', fontSize: '0.65rem', padding: '0.2rem 0.5rem', height: 'auto', gap: '0.2rem' }}>
                                <Download size={10} /> Baixar Receita
                              </button>
@@ -246,7 +247,7 @@ const PatientProfile = () => {
                             <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--mint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Exames Solicitados</span>
                           </div>
                           {c.exames_pdf_url && (
-                             <button className="btn btn-sm" onClick={() => window.open(c.exames_pdf_url, '_blank')} 
+                             <button className="btn btn-sm" onClick={() => openDocument(c.exames_pdf_url)} 
                                style={{ background: 'var(--mint-light)', color: 'var(--mint)', border: 'none', fontSize: '0.65rem', padding: '0.2rem 0.5rem', height: 'auto', gap: '0.2rem' }}>
                                <Download size={10} /> Baixar Pedido
                              </button>
@@ -301,7 +302,7 @@ const PatientProfile = () => {
                         }}>{a.code}</span>
                       </div>
                       {a.pdf_url && (
-                        <button className="btn btn-primary btn-sm" onClick={() => window.open(a.pdf_url, '_blank')} style={{ height: '38px', gap: '0.3rem', padding: '0 0.8rem' }}>
+                        <button className="btn btn-primary btn-sm" onClick={() => openDocument(a.pdf_url)} style={{ height: '38px', gap: '0.3rem', padding: '0 0.8rem' }}>
                           <Download size={14} /> PDF
                         </button>
                       )}
@@ -363,7 +364,7 @@ const ConsultationCard = ({ consultation, expanded }: { consultation: Consultati
       {consultation.pdf_path && (
         <button
           className="btn btn-outline btn-sm"
-          onClick={() => window.open(consultation.pdf_path, '_blank')}
+          onClick={() => openDocument(consultation.pdf_path)}
           style={{ gap: '0.25rem' }}
         >
           <Download size={11} /> PDF

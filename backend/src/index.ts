@@ -12,8 +12,10 @@ import { streamToBuffer } from './utils';
 import sql from './db';
 import { BirdIdService } from './birdid';
 import { PDFTemplate } from './PDFTemplate';
+import { config } from './config';
 import dns from 'dns';
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 // Fix for Supabase IPv6 connection issues (EAI_AGAIN)
 dns.setDefaultResultOrder('ipv4first');
@@ -78,37 +80,22 @@ const io = new Server(httpServer, {
   }
 });
 
-// -- ENV Variables --
-const SUPABASE_URL = process.env.SUPABASE_URL || '';
-const SUPABASE_KEY = process.env.SUPABASE_KEY || ''; // Never commit real keys
-const JWT_SECRET = process.env.JWT_SECRET || 'medpronto-secret-key-2026';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
-
-// Redis removed - Using Supabase PostgreSQL for Queue
-const redis = null;
+// -- Config --
+const { supabaseUrl, supabaseKey, jwtSecret, adminPassword, s3 } = config;
 
 let supabase: any = null;
-if (SUPABASE_URL && SUPABASE_KEY) {
-  supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-} else {
-  console.warn("⚠️ SUPABASE_URL ou SUPABASE_KEY não configurados.");
+if (supabaseUrl && supabaseKey) {
+  supabase = createClient(supabaseUrl, supabaseKey);
 }
 
-// S3 Configuration (Supabase Storage API)
-const S3_ENDPOINT = process.env.S3_ENDPOINT || '';
-const S3_REGION = process.env.S3_REGION || 'us-east-2';
-const S3_ACCESS_KEY = process.env.S3_ACCESS_KEY || '';
-const S3_SECRET_KEY = process.env.S3_SECRET_KEY || '';
-const S3_BUCKET = process.env.S3_BUCKET || 's3';
-
 const s3Client = new S3Client({
-  endpoint: S3_ENDPOINT,
-  region: S3_REGION,
+  endpoint: s3.endpoint,
+  region: s3.region,
   credentials: {
-    accessKeyId: S3_ACCESS_KEY,
-    secretAccessKey: S3_SECRET_KEY
+    accessKeyId: s3.accessKey,
+    secretAccessKey: s3.secretKey
   },
-  forcePathStyle: true // Mandatory for Supabase
+  forcePathStyle: true
 });
 
 async function uploadPDF(bucketName: string, filePath: string, body: Buffer) {
@@ -117,15 +104,12 @@ async function uploadPDF(bucketName: string, filePath: string, body: Buffer) {
     Key: filePath,
     Body: body,
     ContentType: 'application/pdf',
-    ACL: 'public-read'
+    ACL: 'private' // Alterado para privado
   });
   await s3Client.send(command);
   
-  // Construct the public URL manually based on Supabase endpoint structure
-  // Endpoint: https://[project-ref].storage.supabase.co/storage/v1/s3
-  // Final URL: https://[project-ref].supabase.co/storage/v1/object/public/[bucket]/[path]
-  const projectRef = S3_ENDPOINT.split('.')[0].split('//')[1];
-  return `https://${projectRef}.supabase.co/storage/v1/object/public/${bucketName}/${filePath}`;
+  // Retorna apenas a chave do arquivo para ser salva no banco e usada para gerar Signed URLs
+  return filePath;
 }
 
 // -- Middleware for Authentication --
@@ -135,7 +119,7 @@ const authenticateToken = (req: any, res: any, next: any) => {
 
   if (!token) return res.status(401).json({ error: 'Token de acesso não fornecido.' });
 
-  jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
+  jwt.verify(token, jwtSecret, (err: any, user: any) => {
     if (err) return res.status(403).json({ error: 'Token inválido ou expirado.' });
     req.user = user;
     next();
@@ -170,7 +154,9 @@ app.post('/api/patient/auth', async (req, res) => {
       return res.status(401).json({ error: 'Paciente não encontrado ou data de nascimento incorreta.' });
     }
 
-    res.json({ success: true, patient });
+    const token = jwt.sign({ id: patient.id, name: patient.name, role: 'patient' }, jwtSecret, { expiresIn: '24h' });
+
+    res.json({ success: true, patient, token });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -187,8 +173,9 @@ app.post('/api/patient/register', async (req, res) => {
         RETURNING *
     `;
     const patient = results[0];
+    const token = jwt.sign({ id: patient.id, name: patient.name, role: 'patient' }, jwtSecret, { expiresIn: '24h' });
 
-    res.json({ success: true, patient });
+    res.json({ success: true, patient, token });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -201,17 +188,21 @@ app.post('/api/doctor/auth', async (req, res) => {
     const results = await sql`
         SELECT * FROM doctors 
         WHERE (crm = ${login} OR email = ${login}) 
-        AND password = ${password} 
         LIMIT 1
     `;
     const doctor = results[0];
 
-    if (!doctor) {
-      return res.status(401).json({ error: 'Credenciais inválidas. Médico não cadastrado no sistema.' });
+    if (!doctor || !doctor.password) {
+      return res.status(401).json({ error: 'Credenciais inválidas.' });
+    }
+
+    const isPasswordCorrect = await bcrypt.compare(password, doctor.password);
+    if (!isPasswordCorrect) {
+      return res.status(401).json({ error: 'Credenciais inválidas.' });
     }
 
     // Generate JWT for safe doctor UI access
-    const token = jwt.sign({ id: doctor.id, name: doctor.name, role: 'doctor' }, JWT_SECRET, { expiresIn: '8h' });
+    const token = jwt.sign({ id: doctor.id, name: doctor.name, role: 'doctor' }, jwtSecret, { expiresIn: '8h' });
 
     res.json({ success: true, doctor, token });
   } catch (err: any) {
@@ -222,8 +213,8 @@ app.post('/api/doctor/auth', async (req, res) => {
 app.post('/api/admin/auth', async (req, res) => {
   try {
     const { login, password } = req.body;
-    if (login === 'admin@medpronto.com' && password === ADMIN_PASSWORD) {
-      const token = jwt.sign({ id: 'admin-01', name: 'Administrador Senior', role: 'admin' }, JWT_SECRET, { expiresIn: '12h' });
+    if (login === 'admin@medpronto.com' && password === adminPassword) {
+      const token = jwt.sign({ id: 'admin-01', name: 'Administrador Senior', role: 'admin' }, jwtSecret, { expiresIn: '12h' });
       res.json({ success: true, admin: { id: 'admin-01', name: 'Administrador Senior', role: 'admin' }, token });
     } else {
       res.status(401).json({ error: 'Credenciais administrativas inválidas.' });
@@ -254,30 +245,33 @@ app.get('/api/admin/stats', authenticateToken, authorizeAdmin, async (req, res) 
   }
 });
 
-app.post('/api/admin/doctors', async (req, res) => {
+app.post('/api/admin/doctors', authenticateToken, authorizeAdmin, async (req, res) => {
   try {
     const { name, crm, email, password } = req.body;
+    const hashedPassword = await bcrypt.hash(password, 10);
     const results = await sql`
         INSERT INTO doctors (name, crm, email, password) 
-        VALUES (${name}, ${crm}, ${email}, ${password}) 
+        VALUES (${name}, ${crm}, ${email}, ${hashedPassword}) 
         RETURNING *
     `;
-    res.json({ success: true, doctor: results[0] });
+    const doctor = results[0];
+    if (doctor) delete doctor.password;
+    res.json({ success: true, doctor });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.get('/api/admin/doctors', async (req, res) => {
+app.get('/api/admin/doctors', authenticateToken, authorizeAdmin, async (req, res) => {
   try {
-    const doctors = await sql`SELECT * FROM doctors ORDER BY name ASC`;
+    const doctors = await sql`SELECT id, name, crm, email, created_at FROM doctors ORDER BY name ASC`;
     res.json({ success: true, doctors });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.get('/api/admin/patients', async (req, res) => {
+app.get('/api/admin/patients', authenticateToken, authorizeAdmin, async (req, res) => {
   try {
     const patients = await sql`SELECT * FROM patients ORDER BY created_at DESC`;
     res.json({ success: true, patients });
@@ -286,7 +280,7 @@ app.get('/api/admin/patients', async (req, res) => {
   }
 });
 
-app.get('/api/admin/consultations', async (req, res) => {
+app.get('/api/admin/consultations', authenticateToken, authorizeAdmin, async (req, res) => {
   try {
     const consultations = await sql`
         SELECT c.*, p.name as patient_name, p.cpf as patient_cpf, d.name as doctor_name 
@@ -301,7 +295,7 @@ app.get('/api/admin/consultations', async (req, res) => {
   }
 });
 
-app.get('/api/doctor/stats/:doctorId', async (req, res) => {
+app.get('/api/doctor/stats/:doctorId', authenticateToken, authorizeDoctor, async (req, res) => {
   try {
     const { doctorId } = req.params;
     const today = new Date();
@@ -506,7 +500,7 @@ app.post('/api/end-consultation', authenticateToken, authorizeDoctor, async (req
 });
 
 // 5. Generate Medical Certificate (Atestado)
-app.post('/api/atestado', async (req, res) => {
+app.post('/api/atestado', authenticateToken, authorizeDoctor, async (req, res) => {
   try {
     const { patientId, doctorId, daysOff, cid } = req.body;
 
@@ -546,6 +540,28 @@ app.post('/api/atestado', async (req, res) => {
         lastVisit: consultations.length > 0 ? consultations[0].created_at : null,
       }
     });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// 6. Generate Signed URL for S3 Documents
+app.post('/api/documents/signed-url', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { key } = req.body;
+    if (!key) return res.status(400).json({ error: 'Chave do arquivo não fornecida.' });
+
+    // TODO: Adicionar lógica para validar se o usuário tem permissão para ver ESTE documento específico
+    // Por enquanto validamos apenas se está autenticado.
+
+    const command = new GetObjectCommand({
+      Bucket: s3.bucket,
+      Key: key,
+    });
+
+    const url = await getSignedUrl(s3Client, command, { expiresIn: 3600 }); // Expira em 1 hora
+    res.json({ success: true, url });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

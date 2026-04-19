@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { io } from 'socket.io-client';
+import { openDocument } from '../../utils/s3';
 // Mirotalk WebRTC Integration
 
 const PatientConsultationRoom = () => {
@@ -15,7 +16,7 @@ const PatientConsultationRoom = () => {
     if(!user || !docId) { navigate('/patient/login'); return; }
     const s = io(import.meta.env.VITE_API_URL || 'http://localhost:3001');
     s.emit('join_room', roomId);
-    s.on('consultation_ended', (data) => { if(data?.pdf_url) window.open(data.pdf_url, '_blank'); alert("Sua consulta terminou."); navigate('/patient/dashboard'); });
+    s.on('consultation_ended', (data) => { if(data?.pdf_url) openDocument(data.pdf_url); alert("Sua consulta terminou."); navigate('/patient/dashboard'); });
     return () => { s.disconnect(); };
   }, [roomId, user, docId, navigate]);
 

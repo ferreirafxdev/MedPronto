@@ -1,3 +1,4 @@
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Stethoscope, User, CalendarClock, HeartPulse, ArrowRight, Sparkles, Shield, Activity } from 'lucide-react';
 import { useStore } from '../store/useStore';
@@ -5,6 +6,20 @@ import { useStore } from '../store/useStore';
 const HomePage = () => {
   const navigate = useNavigate();
   const { user } = useStore();
+  const [currentSlide, setCurrentSlide] = useState(0);
+
+  const slides = [
+    { url: '/hero_doctor_1.png', alt: 'Médico profissional' },
+    { url: '/hero_patient_1.png', alt: 'Paciente em consulta digital' },
+    { url: '/hero_telemedicine_1.png', alt: 'Telemedicina moderna' }
+  ];
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % slides.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [slides.length]);
 
   return (
     <div className="homepage">
@@ -30,7 +45,7 @@ const HomePage = () => {
               </button>
             ) : (
               <>
-                <button className="btn btn-primary btn-lg" onClick={() => navigate('/patient/login')}>
+                <button className="btn btn-primary btn-lg" onClick={() => navigate('/patient/payment')}>
                   <User size={17} /> Nova Consulta <ArrowRight size={15} />
                 </button>
                 <button className="btn btn-outline btn-lg" onClick={() => navigate('/doctor/login')}>
@@ -41,7 +56,16 @@ const HomePage = () => {
           </div>
         </div>
         <div className="hero-image-wrapper">
-          <img src="/hero.png" alt="Telemedicina" className="hero-image" />
+          <div className="hero-slider-container">
+            {slides.map((slide, index) => (
+              <div 
+                key={index} 
+                className={`hero-slide ${index === currentSlide ? 'active' : ''}`}
+              >
+                <img src={slide.url} alt={slide.alt} />
+              </div>
+            ))}
+          </div>
           <div className="floating-card">
             <div className="doc-avatar"><Stethoscope size={20} color="var(--accent)" /></div>
             <div>

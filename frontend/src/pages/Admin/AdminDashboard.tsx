@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Users, Database, TrendingUp, ArrowUpDown, ExternalLink, RefreshCw, BarChart3, FileText } from 'lucide-react';
 import apiClient from '../../api/client';
 import { io } from 'socket.io-client';
+import { openDocument } from '../../utils/s3';
 
 const AdminDashboard = () => {
     const { user } = useStore();
@@ -177,7 +178,7 @@ const AdminDashboard = () => {
                                         <strong style={{ fontSize: '0.88rem', color: 'var(--text-heading)' }}>{c.patient_name || 'Paciente'}</strong>
                                         <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Por: {c.doctor_name || 'Médico'} • {new Date(c.created_at).toLocaleString('pt-BR')}</div>
                                     </div>
-                                    <button className="btn btn-outline btn-sm" onClick={() => window.open(c.pdf_path, '_blank')} style={{ gap: '0.25rem' }}>
+                                    <button className="btn btn-outline btn-sm" onClick={() => openDocument(c.pdf_path)} style={{ gap: '0.25rem' }}>
                                         <ExternalLink size={11} /> PDF
                                     </button>
                                 </div>
