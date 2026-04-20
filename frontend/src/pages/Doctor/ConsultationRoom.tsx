@@ -109,6 +109,7 @@ const ConsultationRoom = () => {
       <div>
         <h4 style={{ margin: 0, color: 'var(--text-heading)', fontSize: '0.95rem', fontWeight: 700 }}>{title}</h4>
         <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>{desc}</p>
+      </div>
     </div>
   );
 
