@@ -36,7 +36,7 @@ const PatientConsultationRoom = () => {
 
       <div style={{ flexGrow: 1, position: 'relative', background: '#000' }}>
           <iframe
-            src={`https://p2p.mirotalk.com/join/${roomName}?name=${encodeURIComponent(user?.name || 'Paciente')}`}
+            src={`https://p2p.mirotalk.com/join/${roomName}?name=${encodeURIComponent(user?.name || 'Paciente')}&audio=1&video=1&chat=0&settings=0&notify=0`}
             style={{ width: '100%', height: '100%', border: 'none' }}
             allow="camera; microphone; display-capture; fullscreen; clipboard-read; clipboard-write; speaker-selection"
           />

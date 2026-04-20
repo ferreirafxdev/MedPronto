@@ -229,7 +229,7 @@ const PatientProfile = () => {
                             <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Receita</span>
                           </div>
                           {c.receita_pdf_url && (
-                             <button className="btn btn-sm" onClick={() => openDocument(c.receita_pdf_url)} 
+                             <button className="btn btn-sm" onClick={() => c.receita_pdf_url && openDocument(c.receita_pdf_url)} 
                                style={{ background: 'var(--accent-ultra-light)', color: 'var(--accent)', border: 'none', fontSize: '0.65rem', padding: '0.2rem 0.5rem', height: 'auto', gap: '0.2rem' }}>
                                <Download size={10} /> Baixar Receita
                              </button>
@@ -247,7 +247,7 @@ const PatientProfile = () => {
                             <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--mint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Exames Solicitados</span>
                           </div>
                           {c.exames_pdf_url && (
-                             <button className="btn btn-sm" onClick={() => openDocument(c.exames_pdf_url)} 
+                             <button className="btn btn-sm" onClick={() => c.exames_pdf_url && openDocument(c.exames_pdf_url)} 
                                style={{ background: 'var(--mint-light)', color: 'var(--mint)', border: 'none', fontSize: '0.65rem', padding: '0.2rem 0.5rem', height: 'auto', gap: '0.2rem' }}>
                                <Download size={10} /> Baixar Pedido
                              </button>
