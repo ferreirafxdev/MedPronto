@@ -458,7 +458,7 @@ app.post('/api/end-consultation', authenticateToken, authorizeDoctor, async (req
     const buffers: Buffer[] = [];
     doc.on('data', buffers.push.bind(buffers));
 
-    template.drawLayout('Resumo da Consulta de Telemedicina', doctor.name, doctor.crm, validationCode);
+    template.drawLayout('Resumo da Consulta de Telemedicina');
     
     template.addContent(`PACIENTE: ${patient.name.toUpperCase()}\nCPF: ${patient.cpf}\nDATA: ${new Date().toLocaleDateString('pt-BR')}`);
     
@@ -467,7 +467,7 @@ app.post('/api/end-consultation', authenticateToken, authorizeDoctor, async (req
     template.addSection('Prescrição de Conduta', prescriptions);
     if (exams) template.addSection('Exames Solicitados', exams);
 
-    template.finalize();
+    template.finalizeWithFooter(doctor.name, doctor.crm, validationCode);
 
     const pdfBuffer = await new Promise<Buffer>((resolve) => {
       doc.on('end', () => resolve(Buffer.concat(buffers)));
@@ -545,12 +545,12 @@ app.post('/api/atestado', authenticateToken, authorizeDoctor, async (req, res) =
     const buffers: Buffer[] = [];
     doc.on('data', buffers.push.bind(buffers));
 
-    template.drawLayout('Atestado Médico', doctor.name, doctor.crm, validationCode);
+    template.drawLayout('Atestado Médico');
     
     const atestadoContent = `Atesto para os devidos fins que o(a) Sr(a). ${patient.name}, portador(a) do CPF ${patient.cpf}, foi atendido(a) em consulta médica nesta data, devendo permanecer em repouso por um período de ${days} dia(s) a partir desta data.\n\nCID: ${cid || 'Não informado'}\nCódigo de Validação: ${validationCode}`;
 
     template.addSection('Declaração de Comparecimento / Repouso', atestadoContent);
-    template.finalize();
+    template.finalizeWithFooter(doctor.name, doctor.crm, validationCode);
 
 
 // 6. Unified Document Validation

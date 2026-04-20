@@ -110,125 +110,114 @@ const ConsultationRoom = () => {
         <h4 style={{ margin: 0, color: 'var(--text-heading)', fontSize: '0.95rem', fontWeight: 700 }}>{title}</h4>
         <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>{desc}</p>
       </div>
-    </div>
-  );
-
-  return (
-    <div style={{ padding: '1rem 1.5rem', height: '100vh', display: 'flex', flexDirection: 'column', background: '#f8fafc' }}>
-      {/* Top Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', background: 'white', padding: '0.75rem 1.5rem', borderRadius: '1.25rem', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
+    </d  return (
+    <div className="room-full-page animate-fade-in" style={{ display: 'flex', flexDirection: 'column', background: '#0f172a' }}>
+      {/* Dynamic Minimalist Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1.5rem', background: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-          <div>
-            <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Paciente em Atendimento</span>
-            <h2 style={{ margin: 0, fontSize: '1.1rem', color: '#1e293b', fontWeight: 800 }}>{user?.name}</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div className="status-badge" style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+              AO VIVO
+            </div>
+            <div>
+               <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>PACIENTE</span>
+               <h2 style={{ margin: 0, fontSize: '1rem', color: 'white', fontWeight: 700 }}>{user?.name}</h2>
+            </div>
           </div>
-          <div style={{ height: '24px', width: '1px', background: '#e2e8f0' }} />
+          <div style={{ height: '24px', width: '1px', background: 'rgba(255,255,255,0.1)' }} />
           <div>
-            <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 600, color: '#64748b' }}>TEMPO DE CONSULTA</span>
-            <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#f43f5e', fontFeatureSettings: '"tnum"' }}>{formatTime(consultationTime)}</span>
+            <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>EM ATENDIMENTO</h4>
+            <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#f43f5e', fontFamily: 'monospace' }}>{formatTime(consultationTime)}</span>
           </div>
         </div>
+
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: '#f0f9ff', padding: '0.4rem 0.8rem', borderRadius: '2rem', border: '1px solid #bae6fd' }}>
-            <ShieldCheck size={14} color="#0369a1" />
-            <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#0369a1' }}>SALA CRIPTOGRAFADA</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.8rem', borderRadius: '2rem', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)' }}>
+            <ShieldCheck size={14} />
+            <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Criptografia Ativa</span>
           </div>
-          <button className="btn btn-outline btn-sm" style={{ borderColor: '#cbd5e1', color: '#64748b' }} onClick={() => navigate('/doctor/dashboard')}>Ver Painel</button>
+          <button className="btn btn-outline btn-sm" style={{ color: 'white', borderColor: 'rgba(255,255,255,0.2)' }} onClick={() => navigate('/doctor/dashboard')}>Ver Painel</button>
         </div>
       </div>
 
-      <div style={{ flexGrow: 1, display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '1rem', overflow: 'hidden' }}>
-        {/* Left: Video and Chat */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
-          <div className="video-card" style={{ flexGrow: 1, background: '#0f172a', borderRadius: '1.5rem', overflow: 'hidden', border: '1px solid #334155', position: 'relative' }}>
-             <iframe
-               src={`https://p2p.mirotalk.com/join/${roomName}?name=${encodeURIComponent(user?.name || 'Médico')}`}
-               style={{ width: '100%', height: '100%', border: 'none' }}
-               allow="camera; microphone; display-capture; fullscreen; clipboard-read; clipboard-write; speaker-selection"
-             />
-          </div>
-          <div className="chat-card" style={{ height: '180px', background: 'white', borderRadius: '1.25rem', border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 2px 4px rgba(0,0,0,0.02)' }}>
-            <div style={{ padding: '0.5rem 1rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontWeight: 700, fontSize: '0.75rem', color: '#475569' }}>MENSAGENS</span>
-            </div>
-            <div style={{ flexGrow: 1, overflowY: 'auto', padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              {messages.length === 0 ? <p style={{ textAlign: 'center', color: '#94a3b8', fontSize: '0.75rem', margin: '1rem 0' }}>Sem mensagens ainda...</p> : messages.map((m, i) => (
-                <div key={i} style={{ alignSelf: m.sender === 'Você' ? 'flex-end' : 'flex-start', maxWidth: '85%' }}>
-                   <div style={{ background: m.sender === 'Você' ? 'var(--accent)' : '#f1f5f9', color: m.sender === 'Você' ? 'white' : '#334155', padding: '0.4rem 0.75rem', borderRadius: '1rem', fontSize: '0.8rem', fontWeight: 500 }}>{m.text}</div>
-                </div>
-              ))}
-            </div>
-            <form onSubmit={sendMessage} style={{ padding: '0.5rem', display: 'flex', gap: '0.5rem' }}>
-              <input type="text" className="form-control" style={{ borderRadius: '1rem', fontSize: '0.8rem', height: '32px' }} value={newMessage} onChange={e=>setNewMessage(e.target.value)} placeholder="Digite aqui..." />
-              <button type="submit" className="btn btn-primary" style={{ height: '32px', width: '32px', padding: 0, minWidth: '32px', borderRadius: '50%' }}><Send size={14} /></button>
-            </form>
-          </div>
+      <div style={{ flexGrow: 1, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 420px', overflow: 'hidden' }}>
+        {/* Main Video Area */}
+        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column' }}>
+           <div style={{ flexGrow: 1, position: 'relative', background: '#000' }}>
+              <iframe
+                src={`https://p2p.mirotalk.com/join/${roomName}?name=${encodeURIComponent(user?.name || 'Médico')}`}
+                style={{ width: '100%', height: '100%', border: 'none' }}
+                allow="camera; microphone; display-capture; fullscreen; clipboard-read; clipboard-write; speaker-selection"
+              />
+           </div>
+           
+           {/* Chat Overlay (Optional) or bottom bar */}
+           <div style={{ position: 'absolute', bottom: '20px', left: '20px', width: '320px', maxHeight: '200px', background: 'rgba(15, 23, 42, 0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', display: 'flex', flexDirection: 'column', overflow: 'hidden', backdropFilter: 'blur(8px)' }}>
+              <div style={{ padding: '0.4rem 0.75rem', background: 'rgba(255,255,255,0.05)', fontSize: '0.65rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.05em' }}>MENSAGENS</div>
+              <div style={{ flexGrow: 1, padding: '0.75rem', overflowY: 'auto' }}>
+                 {messages.length === 0 ? <p style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)' }}>Sem mensagens...</p> : messages.map((m, i) => (
+                    <div key={i} style={{ marginBottom: '0.4rem' }}>
+                       <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent)' }}>{m.sender}: </span>
+                       <span style={{ fontSize: '0.75rem', color: 'white' }}>{m.text}</span>
+                    </div>
+                 ))}
+              </div>
+              <form onSubmit={sendMessage} style={{ display: 'flex', padding: '0.5rem', gap: '0.4rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                 <input type="text" className="form-control" style={{ height: '28px', background: 'rgba(255,255,255,0.05)', border: 'none', color: 'white', fontSize: '0.75rem' }} value={newMessage} onChange={e=>setNewMessage(e.target.value)} placeholder="Enviar mensagem..." />
+                 <button type="submit" className="btn btn-primary" style={{ width: '28px', height: '28px', padding: 0 }}><Send size={12} /></button>
+              </form>
+           </div>
         </div>
 
-        {/* Right: Prontuário Premium */}
-        <div style={{ display: 'flex', flexDirection: 'column', background: 'white', borderRadius: '1.5rem', border: '1px solid #e2e8f0', overflow: 'hidden', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.04)' }}>
-          {/* Custom Tab Bar */}
-          <div style={{ display: 'flex', padding: '0.75rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', gap: '0.4rem' }}>
+        {/* Sidebar Medical Tools (Prontuário) */}
+        <div style={{ background: '#fff', borderLeft: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', padding: '0.5rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', gap: '0.2rem' }}>
             <TabBtn active={activeTab === 'evolucao'} onClick={()=>setActiveTab('evolucao')} icon={Edit3} label="Evolução" />
             <TabBtn active={activeTab === 'receituario'} onClick={()=>setActiveTab('receituario')} icon={PenTool} label="Receita" />
             <TabBtn active={activeTab === 'exames'} onClick={()=>setActiveTab('exames')} icon={ClipboardList} label="Exames" />
             <TabBtn active={activeTab === 'atestado'} onClick={()=>setActiveTab('atestado')} icon={FileText} label="Atestado" />
           </div>
 
-          <div style={{ flexGrow: 1, padding: '1.5rem', overflowY: 'auto' }}>
+          <div style={{ flexGrow: 1, padding: '1.25rem', overflowY: 'auto' }}>
             {activeTab === 'evolucao' && (
               <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <SectionHeader icon={Edit3} title="Evolução Clínica" desc="Registro detalhado do atendimento e quadro clínico." />
-                <textarea className="form-control" style={{ flexGrow: 1, resize: 'none', border: '1px solid #e2e8f0', background: '#fcfdfe', padding: '1rem', lineHeight: '1.5', fontSize: '0.92rem' }} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Paciente queixa-se de..." />
+                <SectionHeader icon={Edit3} title="Evolução Clínica" desc="Quadro clínico e anamnese." />
+                <textarea className="form-control" style={{ flexGrow: 1, resize: 'none', border: '1px solid #f1f5f9', background: '#f8fafc', padding: '1rem', borderRadius: '1rem' }} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Paciente apresenta..." />
               </div>
             )}
             {activeTab === 'receituario' && (
               <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <SectionHeader icon={PenTool} title="Receituário Digital" desc="Medicamentos, dosagens e instruções de uso." />
-                <textarea className="form-control" style={{ flexGrow: 1, resize: 'none', border: '1px solid #e2e8f0', background: '#fdfcfe', padding: '1rem', lineHeight: '1.5', fontSize: '0.92rem' }} value={prescriptions} onChange={e=>setPrescriptions(e.target.value)} placeholder="1. Amoxicilina 500mg..." />
-                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
-                  <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => downloadPDF('receita', { prescriptions }, 'receita.pdf')} disabled={loading}><Download size={14} /> Rascunho PDF</button>
-                  <button className="btn btn-primary" style={{ flex: 1.8 }} onClick={startDigitalSignature} disabled={loading || signingStatus === 'signed'}>
-                    {signingStatus === 'signed' ? <><ShieldCheck size={16} /> Emitir & Assinar</> : <><PenTool size={16} /> Assinar Bird ID</>}
+                <SectionHeader icon={PenTool} title="Receituário" desc="Prescrição digital assinada." />
+                <textarea className="form-control" style={{ flexGrow: 1, resize: 'none', border: '1px solid #f1f5f9', background: '#f8fafc', padding: '1rem', borderRadius: '1rem' }} value={prescriptions} onChange={e=>setPrescriptions(e.target.value)} placeholder="1. ..." />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginTop: '1rem' }}>
+                  <button className="btn btn-outline btn-sm" onClick={() => downloadPDF('receita', { prescriptions }, 'receita.pdf')} disabled={loading}>Rascunho</button>
+                  <button className="btn btn-primary btn-sm" onClick={startDigitalSignature} disabled={loading || signingStatus === 'signed'}>
+                    {signingStatus === 'signed' ? 'Assinado ✅' : 'Assinar Bird ID'}
                   </button>
                 </div>
               </div>
             )}
             {activeTab === 'exames' && (
               <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <SectionHeader icon={ClipboardList} title="Pedido de Exames" desc="Solicitações laboratoriais ou de imagem." />
-                <textarea className="form-control" style={{ flexGrow: 1, resize: 'none', border: '1px solid #e2e8f0', padding: '1rem' }} value={exams} onChange={e=>setExams(e.target.value)} placeholder="Hemograma completo..." />
-                <button className="btn btn-primary" onClick={() => downloadPDF('exames', { exams }, 'pedido_exame.pdf')} disabled={loading} style={{ marginTop: '1rem' }}>
-                  <Download size={16} /> Gerar Pedido de Exame
-                </button>
+                <SectionHeader icon={ClipboardList} title="Pedidos de Exame" desc="Solicitações laboratoriais." />
+                <textarea className="form-control" style={{ flexGrow: 1, resize: 'none', border: '1px solid #f1f5f9', background: '#f8fafc', padding: '1rem', borderRadius: '1rem' }} value={exams} onChange={e=>setExams(e.target.value)} placeholder="Exames..." />
+                <button className="btn btn-primary btn-sm" onClick={() => downloadPDF('exames', { exams }, 'pedido_exame.pdf')} disabled={loading} style={{ marginTop: '1rem' }}>Gerar Pedido</button>
               </div>
             )}
             {activeTab === 'atestado' && (
               <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <SectionHeader icon={FileText} title="Atestado Médico" desc="Documento de afastamento e justificativa." />
-                <div style={{ background: '#f8fafc', padding: '1.25rem', borderRadius: '1rem', border: '1px solid #e2e8f0', marginBottom: '1rem' }}>
-                  <div className="form-group">
-                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>DIAS DE AFASTAMENTO</label>
-                    <input type="number" className="form-control" value={daysOff} onChange={e=>setDaysOff(e.target.value)} min="1" />
-                  </div>
-                  <div className="form-group" style={{ marginTop: '1rem' }}>
-                    <label style={{ fontSize: '0.75rem', fontWeight: 700, color: '#475569' }}>CID-10</label>
-                    <input type="text" className="form-control" value={cid} onChange={e=>setCid(e.target.value)} placeholder="Ex: J06" />
-                  </div>
+                <SectionHeader icon={FileText} title="Atestado Médico" desc="Afastamento e justificativa." />
+                <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '1rem', border: '1px solid #f1f5f9', marginBottom: '1rem' }}>
+                   <div className="form-group"><label style={{ fontSize: '0.7rem', fontWeight: 700 }}>DIAS</label><input type="number" className="form-control" value={daysOff} onChange={e=>setDaysOff(e.target.value)} /></div>
+                   <div className="form-group" style={{ marginTop: '0.75rem' }}><label style={{ fontSize: '0.7rem', fontWeight: 700 }}>CID</label><input type="text" className="form-control" value={cid} onChange={e=>setCid(e.target.value)} placeholder="Ex: J06" /></div>
                 </div>
-                <button className="btn btn-primary" onClick={() => downloadPDF('atestado', { daysOff, cid }, 'atestado.pdf')} disabled={loading}>
-                  <Download size={16} /> Gerar Atestado PDF
-                </button>
+                <button className="btn btn-primary btn-sm" onClick={() => downloadPDF('atestado', { daysOff, cid }, 'atestado.pdf')} disabled={loading}>Emitir Atestado</button>
               </div>
             )}
           </div>
 
-          <div style={{ padding: '1rem 1.5rem', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <div style={{ width: '8px', height: '8px', background: 'var(--mint)', borderRadius: '50%' }} />
-              <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600 }}>AUTO-SAVE ATIVO</span>
-            </div>
-            <button className="btn btn-primary" onClick={endConsultation} disabled={loading} style={{ background: '#0f172a', borderColor: '#0f172a', padding: '0.6rem 2rem', borderRadius: '2rem' }}>
+          <div style={{ padding: '1.25rem', borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
+            <button className="btn btn-primary btn-full btn-lg" onClick={endConsultation} disabled={loading} style={{ background: '#0f172a', borderRadius: '3rem' }}>
               {loading ? "Processando..." : "FINALIZAR ATENDIMENTO"}
             </button>
           </div>

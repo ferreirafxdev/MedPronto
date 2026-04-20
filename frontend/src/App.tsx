@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import AdminDashboard from './pages/Admin/AdminDashboard';
 import AdminLogin from './pages/Admin/AdminLogin';
 import PatientLogin from './pages/Patient/PatientLogin';
@@ -14,13 +14,15 @@ import VerifyDocument from './pages/VerifyDocument';
 import Header from './components/Header';
 import './index.css';
 
-function App() {
+function AppContent() {
+  const location = useLocation();
+  const isRoom = location.pathname.includes('/consultation/');
+
   return (
-    <BrowserRouter>
-      <div className="app-container">
-        <Header />
-        <main className="main-content">
-          <Routes>
+    <div className={`app-container ${isRoom ? 'no-header' : ''}`}>
+      {!isRoom && <Header />}
+      <main className="main-content">
+        <Routes>
             <Route path="/" element={<HomePage />} />
             
             {/* Admin Routes */}
@@ -38,10 +40,17 @@ function App() {
             <Route path="/doctor/login" element={<DoctorLogin />} />
             <Route path="/doctor/dashboard" element={<DoctorDashboard />} />
             <Route path="/doctor/consultation/:roomId" element={<ConsultationRoom />} />
-            <Route path="/validar" element={<VerifyDocument />} />
-          </Routes>
-        </main>
-      </div>
+          <Route path="/validar" element={<VerifyDocument />} />
+        </Routes>
+      </main>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <AppContent />
     </BrowserRouter>
   );
 }

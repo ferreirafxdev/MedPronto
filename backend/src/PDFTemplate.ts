@@ -22,10 +22,9 @@ export class PDFTemplate {
         return this.doc;
     }
 
-    drawLayout(title: string, doctorName: string, doctorCRM: string, validationCode?: string) {
+    drawLayout(title: string) {
         this.drawHeader();
         this.drawTitle(title);
-        this.drawFooter(doctorName, doctorCRM, validationCode);
     }
 
     private drawHeader() {
@@ -63,12 +62,13 @@ export class PDFTemplate {
     }
 
     private drawTitle(title: string) {
-        this.doc.moveDown(1.5);
-        this.doc.fontSize(14)
+        // Move significantly down to avoid overlapping header line
+        this.doc.moveDown(2);
+        this.doc.fontSize(15)
             .font('Helvetica-Bold')
             .fillColor(this.secondaryColor)
             .text(title.toUpperCase(), { align: 'center' });
-        this.doc.moveDown(1);
+        this.doc.moveDown(1.5);
     }
 
     private drawFooter(doctorName: string, doctorCRM: string, validationCode?: string) {
@@ -107,14 +107,12 @@ export class PDFTemplate {
     }
 
     addContent(content: string) {
-        // Reduced gap to ensure all info fits on one page
-        this.doc.moveDown(0.5);
-        this.doc.fontSize(10) // Small font for body
+        this.doc.fontSize(10)
             .font('Helvetica')
             .fillColor(this.secondaryColor)
             .text(content, {
                 align: 'justify',
-                lineGap: 2, // Much tighter spacing
+                lineGap: 2,
                 paragraphGap: 6
             });
     }
@@ -129,7 +127,8 @@ export class PDFTemplate {
         });
     }
 
-    finalize() {
+    finalizeWithFooter(doctorName: string, doctorCRM: string, validationCode?: string) {
+        this.drawFooter(doctorName, doctorCRM, validationCode);
         this.doc.end();
     }
 }

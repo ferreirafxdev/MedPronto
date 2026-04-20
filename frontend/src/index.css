@@ -423,4 +423,80 @@ h1, h2, h3, h4, h5, h6 {
   padding: 80px 2rem 40px 2rem;
 }
 
+/* ===== PREMIUM SYSTEM UTILITIES ===== */
+.iridescent-card {
+    position: relative;
+    background: var(--bg-white);
+    border-radius: var(--radius-2xl);
+    z-index: 1;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.iridescent-card::before {
+    content: '';
+    position: absolute;
+    top: -2px; left: -2px; right: -2px; bottom: -2px;
+    background: linear-gradient(45deg, #10b981, #0ea5e9, #6366f1, #d946ef, #10b981);
+    background-size: 400% 400%;
+    z-index: -1;
+    animation: rainbow-border 12s ease infinite;
+    opacity: 0.12;
+    border-radius: calc(var(--radius-2xl) + 2px);
+}
+
+@keyframes rainbow-border {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+/* Consultation Room Full-Screen Overrides */
+.app-container.no-header .main-content {
+    margin-top: 0 !important;
+    padding: 0 !important;
+}
+
+.room-full-page {
+    height: 100vh;
+    overflow: hidden;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Bento Grid Enhanced Support */
+.bento-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: auto;
+    gap: 1.5rem;
+}
+
+.bento-item {
+    transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.bento-item:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 24px 48px rgba(15, 23, 42, 0.08);
+}
+
+.bento-featured {
+    grid-column: span 2;
+}
+
+.bento-tall {
+    grid-row: span 2;
+}
+
+@media (max-width: 1024px) {
+    .bento-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 640px) {
+    .bento-grid { grid-template-columns: 1fr; }
+    .bento-featured { grid-column: span 1; }
+}
+
 

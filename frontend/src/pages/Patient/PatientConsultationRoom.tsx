@@ -23,17 +23,30 @@ const PatientConsultationRoom = () => {
   const roomName = `MedProntoRoom_Doc_${docId?.replace(/[^a-zA-Z0-9]/g, '')}`;
 
   return (
-    <div style={{ padding: '0 2rem 2rem 2rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem', background: 'var(--bg-white)', padding: '0.75rem 1.15rem', borderRadius: 'var(--radius-xl)', border: '1px solid var(--border)', marginTop: '0.85rem', boxShadow: 'var(--shadow-sm)' }}>
-        <h2 style={{ margin: 0, fontSize: '1.15rem' }}>Telemedicina — <span className="text-gradient">Pronto Socorro</span></h2>
-        <span className="status-badge status-active">Aguarde o Médico</span>
+    <div className="room-full-page animate-fade-in" style={{ display: 'flex', flexDirection: 'column', background: '#0f172a' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 2rem', background: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(10px)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div className="status-badge" style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)' }}>AO VIVO</div>
+          <h2 style={{ margin: 0, fontSize: '1rem', color: 'white', fontWeight: 700 }}>Telemedicina — <span className="text-gradient">Pronto Socorro Online</span></h2>
+        </div>
+        <div style={{ padding: '0.4rem 1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '2rem', border: '1px solid rgba(255,255,255,0.1)', color: 'white', fontSize: '0.75rem', fontWeight: 600 }}>
+          {user?.name}
+        </div>
       </div>
-      <div className="video-container" style={{ height: 'calc(100vh - 180px)', position: 'relative', borderRadius: 'var(--radius-xl)', overflow: 'hidden', border: '1px solid var(--border)' }}>
+
+      <div style={{ flexGrow: 1, position: 'relative', background: '#000' }}>
           <iframe
             src={`https://p2p.mirotalk.com/join/${roomName}?name=${encodeURIComponent(user?.name || 'Paciente')}`}
             style={{ width: '100%', height: '100%', border: 'none' }}
             allow="camera; microphone; display-capture; fullscreen; clipboard-read; clipboard-write; speaker-selection"
           />
+          
+          <div style={{ position: 'absolute', bottom: '30px', left: '30px', background: 'rgba(15, 23, 42, 0.85)', padding: '1rem 1.5rem', borderRadius: '1rem', border: '1px solid rgba(255,255,255,0.1)', color: 'white', backdropFilter: 'blur(8px)', maxWidth: '350px' }}>
+            <h4 style={{ margin: '0 0 0.25rem 0', fontSize: '0.9rem' }}>Aguardando o Médico</h4>
+            <p style={{ margin: 0, fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', lineHeight: '1.4' }}>
+              Sua conexão é segura e criptografada. Mantenha esta janela aberta; você receberá seus documentos aqui assim que a consulta terminar.
+            </p>
+          </div>
       </div>
     </div>
   );
