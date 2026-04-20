@@ -109,8 +109,10 @@ const ConsultationRoom = () => {
       <div>
         <h4 style={{ margin: 0, color: 'var(--text-heading)', fontSize: '0.95rem', fontWeight: 700 }}>{title}</h4>
         <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>{desc}</p>
-      </div>
-    </d  return (
+    </div>
+  );
+
+  return (
     <div className="room-full-page animate-fade-in" style={{ display: 'flex', flexDirection: 'column', background: '#0f172a' }}>
       {/* Dynamic Minimalist Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1.5rem', background: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
@@ -126,7 +128,7 @@ const ConsultationRoom = () => {
           </div>
           <div style={{ height: '24px', width: '1px', background: 'rgba(255,255,255,0.1)' }} />
           <div>
-            <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>EM ATENDIMENTO</h4>
+            <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>EM ATENDIMENTO</span>
             <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#f43f5e', fontFamily: 'monospace' }}>{formatTime(consultationTime)}</span>
           </div>
         </div>
