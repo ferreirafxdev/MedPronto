@@ -178,6 +178,16 @@ app.post('/api/patient/register', authLimiter, async (req, res) => {
   console.log('📝 Recebendo registro de paciente:', req.body?.name);
   try {
     const { name, cpf, age, email, birthDate } = req.body;
+    
+    // Check if patient already exists by CPF
+    const existingPatient = await sql`SELECT * FROM patients WHERE cpf = ${cpf} LIMIT 1`;
+    if (existingPatient[0]) {
+      return res.status(409).json({ 
+        error: 'Este CPF já está cadastrado em nosso sistema.', 
+        suggestion: 'login' 
+      });
+    }
+
     // Insert real patient into Neon
     const results = await sql`
         INSERT INTO patients (name, cpf, age, email, birth_date) 
@@ -259,11 +269,11 @@ app.get('/api/admin/stats', authenticateToken, authorizeAdmin, async (req, res) 
 
 app.post('/api/admin/doctors', authenticateToken, authorizeAdmin, authLimiter, async (req, res) => {
   try {
-    const { name, crm, email, password } = req.body;
+    const { name, crm, cpf, email, password } = req.body;
     const hashedPassword = await bcrypt.hash(password, 10);
     const results = await sql`
-        INSERT INTO doctors (name, crm, email, password) 
-        VALUES (${name}, ${crm}, ${email}, ${hashedPassword}) 
+        INSERT INTO doctors (name, crm, cpf, email, password) 
+        VALUES (${name}, ${crm}, ${cpf}, ${email}, ${hashedPassword}) 
         RETURNING *
     `;
     const doctor = results[0];

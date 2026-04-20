@@ -148,9 +148,10 @@ const AdminDashboard = () => {
                                     try { setLoading(true); const res = await apiClient.post('/api/admin/doctors', payload); if(res.data.success) { alert("Médico cadastrado!"); (e.target as HTMLFormElement).reset(); fetchDoctors(); } }
                                     catch(err: any) { alert(err.response?.data?.error || "Erro ao cadastrar"); } finally { setLoading(false); }
                                 }}>
-                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem' }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.65rem' }}>
                                         <input name="name" className="form-control" placeholder="Nome do Médico" required />
                                         <input name="crm" className="form-control" placeholder="CRM (Ex: 123456)" required />
+                                        <input name="cpf" className="form-control" placeholder="CPF (Apenas números)" required />
                                         <input name="email" type="email" className="form-control" placeholder="E-mail" required />
                                         <input name="password" type="password" className="form-control" placeholder="Senha" required />
                                     </div>
@@ -159,12 +160,15 @@ const AdminDashboard = () => {
                                     </button>
                                 </form>
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '0.65rem' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '0.85rem' }}>
                                 {doctors.map(d => (
-                                    <div key={d.id} style={{ background: 'var(--bg-subtle)', padding: '0.85rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-                                        <div style={{ fontWeight: 600, color: 'var(--accent)', fontSize: '0.85rem' }}>{d.name}</div>
-                                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>CRM {d.crm}</div>
-                                        <div style={{ fontSize: '0.72rem', color: 'var(--text-body)', marginTop: '0.15rem' }}>{d.email}</div>
+                                    <div key={d.id} className="premium-card" style={{ padding: '1rem', border: '1px solid var(--border)' }}>
+                                        <div style={{ fontWeight: 700, color: 'var(--accent)', fontSize: '0.9rem' }}>{d.name}</div>
+                                        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.25rem' }}>
+                                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>CRM {d.crm}</div>
+                                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>CPF {d.cpf}</div>
+                                        </div>
+                                        <div style={{ fontSize: '0.72rem', color: 'var(--text-body)', marginTop: '0.25rem' }}>{d.email}</div>
                                     </div>
                                 ))}
                             </div>

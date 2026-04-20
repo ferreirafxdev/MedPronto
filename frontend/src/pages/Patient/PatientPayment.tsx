@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, Wifi, ArrowRight, CreditCard, ShieldCheck, CheckCircle } from 'lucide-react';
 import apiClient from '../../api/client';
+import { useStore } from '../../store/useStore';
 
 const PatientPayment = () => {
   const navigate = useNavigate();
+  const { user } = useStore();
   const [loading, setLoading] = useState(false);
   const [pixKey, setPixKey] = useState('');
   const [step, setStep] = useState(1); // 1: Info, 2: PIX, 3: Success
@@ -34,7 +36,11 @@ const PatientPayment = () => {
       setLoading(false);
       // Wait a bit to show success before redirecting
       setTimeout(() => {
-        navigate('/patient/login?mode=register');
+        if (user) {
+          navigate('/patient/dashboard?new_consultation=true');
+        } else {
+          navigate('/patient/login?mode=register');
+        }
       }, 2000);
     }, 1500);
   };

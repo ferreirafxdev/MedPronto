@@ -103,7 +103,14 @@ const PatientLogin = () => {
         }
       }
     } catch (error: any) {
-      alert(error.response?.data?.error || "Credenciais inválidas ou erro de conexão.");
+      if (error.response?.status === 409) {
+        alert("Parece que você já é nosso paciente! Verificamos que este CPF já possui um cadastro. \n\nVamos te levar para a tela de login para você continuar seu atendimento.");
+        setIsLogin(true);
+        // Pre-fill the CPF if we have it
+        setFormData(prev => ({ ...prev, name: '', email: '', complaint: '' }));
+      } else {
+        alert(error.response?.data?.error || "Credenciais inválidas ou erro de conexão.");
+      }
     } finally { setLoading(false); }
   };
 

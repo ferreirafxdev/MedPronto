@@ -15,6 +15,7 @@ const PatientDashboard = () => {
   const [roomData, setRoomData] = useState<{ roomId: string, doctorId: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [complaint, setComplaint] = useState('');
+  const [showComplaintModal, setShowComplaintModal] = useState(false);
 
   const handleEnqueue = useCallback(async (customComplaint?: string) => {
     if (!user) return;
@@ -26,6 +27,8 @@ const PatientDashboard = () => {
       });
       if (resp.data.success) {
         setInQueue(true);
+        localStorage.removeItem('payment_confirmed');
+        setShowComplaintModal(false);
       }
     } catch (e) {
       console.error("Erro ao entrar na fila");
@@ -40,11 +43,18 @@ const PatientDashboard = () => {
     const checkStatus = async () => {
       try {
         const resp = await apiClient.get(`/api/patient/check-queue/${user.id}`);
+        
+        const isNewConsultation = searchParams.get('new_consultation') === 'true' || localStorage.getItem('payment_confirmed') === 'true';
+
         if (resp.data.inQueue) {
           setInQueue(true);
           setLoading(false);
+        } else if (isNewConsultation) {
+           // For returning patients who just paid, ask for complaint first
+           setShowComplaintModal(true);
+           setLoading(false);
         } else if (searchParams.get('just_registered') === 'true') {
-          // AUTO-ENQUEUE for new registrations
+          // AUTO-ENQUEUE for new registrations (who already filled complaint in register form)
           await handleEnqueue();
         } else {
           setLoading(false);
@@ -171,6 +181,48 @@ const PatientDashboard = () => {
           <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--violet)' }}>Ver documentos →</span>
         </div>
       </div>
+
+      {/* COMPLAINT MODAL FOR RETURNING PATIENTS */}
+      {showComplaintModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(8px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+          <div className="premium-card animate-fade-in" style={{ maxWidth: '500px', width: '100%', boxShadow: '0 0 100px rgba(0,0,0,0.5)' }}>
+            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+               <div className="icon-wrapper" style={{ background: 'var(--accent-ultra-light)', margin: '0 auto 1rem' }}>
+                  <MessageSquare size={28} color="var(--accent)" />
+               </div>
+               <h3 style={{ fontSize: '1.4rem' }}>O que você está sentindo?</h3>
+               <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Dê um resumo rápido para o médico antes de iniciar.</p>
+            </div>
+            
+            <div className="form-group">
+                <textarea 
+                    className="form-control" 
+                    placeholder="Ex: Estou com febre e dor de cabeça há 2 dias..." 
+                    rows={4} 
+                    value={complaint} 
+                    onChange={e => setComplaint(e.target.value)}
+                    style={{ resize: 'none' }}
+                />
+            </div>
+            
+            <button 
+                className="btn btn-primary btn-full btn-lg" 
+                onClick={() => handleEnqueue()}
+                disabled={!complaint.trim() || loading}
+            >
+                {loading ? <Loader2 className="animate-spin" /> : 'Entrar na Fila Agora'}
+            </button>
+            
+            <button 
+                className="btn btn-outline btn-full" 
+                style={{ marginTop: '0.75rem', border: 'none', color: 'var(--text-faint)' }}
+                onClick={() => setShowComplaintModal(false)}
+            >
+                Cancelar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
