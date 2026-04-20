@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
-import { Loader2, Activity, Clock, Wifi, Video, FileText, AlertCircle, ExternalLink, BadgeAlert } from 'lucide-react';
+import { Loader2, Activity, Clock, Wifi, Video, FileText, AlertCircle, ExternalLink, BadgeAlert, MessageSquare } from 'lucide-react';
 import { io } from 'socket.io-client';
 import apiClient from '../../api/client';
 import { openDocument } from '../../utils/s3';

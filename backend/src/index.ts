@@ -496,7 +496,7 @@ app.post('/api/end-consultation', authenticateToken, authorizeDoctor, async (req
     let pdfUrl = '';
 
     try {
-      pdfUrl = await uploadPDF(S3_BUCKET, filePath, pdfBuffer);
+      pdfUrl = await uploadPDF(s3.bucket, filePath, pdfBuffer);
       console.log(`✅ Prontuário salvo no S3: ${pdfUrl}`);
     } catch (error: any) {
       console.error("Erro no S3 Upload:", error.message);
@@ -562,7 +562,23 @@ app.post('/api/atestado', authenticateToken, authorizeDoctor, async (req, res) =
     template.addSection('Declaração de Comparecimento / Repouso', atestadoContent);
     template.finalizeWithFooter(doctor.name, doctor.crm, validationCode);
 
+    const pdfBuffer = await new Promise<Buffer>((resolve) => {
+      doc.on('end', () => resolve(Buffer.concat(buffers)));
+    });
 
+    const filePath = `atestados/${patientId}_${validationCode}.pdf`;
+    let pdfUrl = '';
+    try {
+      pdfUrl = await uploadPDF(s3.bucket, filePath, pdfBuffer);
+    } catch (e) {
+      console.error("Erro upload atestado:", e);
+    }
+
+    res.json({ success: true, code: validationCode, pdf_url: pdfUrl });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
 // 6. Unified Document Validation
 app.get('/api/validate-document/:code', async (req, res) => {
   try {
