@@ -24,7 +24,10 @@ const Header = () => {
     setMobileMenuOpen(false);
   };
 
-  const isActive = (path: string) => location.pathname.startsWith(path);
+  const isActive = (path: string) => {
+    if (path === '/') return location.pathname === '/';
+    return location.pathname.startsWith(path);
+  };
 
   return (
     <header className={`header ${isScrolled ? 'header-scrolled' : ''}`}>
@@ -41,7 +44,7 @@ const Header = () => {
 
         {/* Desktop Nav */}
         <nav className="desktop-nav">
-          <NavLink to="/" active={location.pathname === '/'} icon={<Home size={15} />} label="Início" />
+          <NavLink to="/" active={isActive('/')} icon={<Home size={15} />} label="Início" />
 
           {!user && (
             <>
@@ -71,14 +74,14 @@ const Header = () => {
         </nav>
 
         {/* Mobile Toggle */}
-        <button className="mobile-toggle" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-          {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+        <button className="mobile-toggle" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label="Toggle Menu">
+          {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
           <div className="mobile-menu">
-            <NavLink to="/" active={location.pathname === '/'} icon={<Home size={18} />} label="Início" onClick={() => setMobileMenuOpen(false)} />
+            <NavLink to="/" active={isActive('/')} icon={<Home size={18} />} label="Início" onClick={() => setMobileMenuOpen(false)} />
             {!user && (
               <>
                 <NavLink to="/patient/login" active={isActive('/patient')} icon={<User size={18} />} label="Pacientes" onClick={() => setMobileMenuOpen(false)} />
@@ -95,10 +98,10 @@ const Header = () => {
                   <NavLink to="/doctor/dashboard" active={isActive('/doctor/dashboard')} icon={<Activity size={18} />} label="Minha Fila" onClick={() => setMobileMenuOpen(false)} />
                 )}
                 <div className="mobile-user-info">
-                    <strong>{user.name}</strong>
-                    <span>{user.role}</span>
+                    <div className="user-name">{user.name}</div>
+                    <div className="user-role">{user.role}</div>
                 </div>
-                <button onClick={handleLogout} className="btn btn-danger btn-full" style={{ marginTop: '1rem' }}>
+                <button onClick={handleLogout} className="btn-logout" style={{ width: '100%', justifyContent: 'center', marginTop: '0.5rem', background: 'var(--coral)', color: 'white', borderColor: 'var(--coral)' }}>
                   <LogOut size={16} /> Sair do Sistema
                 </button>
               </>
