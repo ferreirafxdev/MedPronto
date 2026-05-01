@@ -90,6 +90,17 @@ const AdminDashboard = () => {
     finally { setLoading(false); }
   };
 
+  const handleReleaseDocument = async (type: 'ATESTADO' | 'RECEITA', id: string, released: boolean) => {
+    try {
+      await apiClient.post('/api/admin/release-document', { type, id, released });
+      // Refresh local state
+      if (selectedRecord) {
+        handleViewRecord(selectedRecord.patient.id);
+      }
+    } catch (e) { alert("Erro ao atualizar liberação"); }
+  };
+
+
   const downloadRecord = (record: any) => {
     const content = `
 PRONTUÁRIO MÉDICO - MEDPRONTO
@@ -355,7 +366,17 @@ CID: ${a.cid}
                         <div key={c.id} style={{ padding: '1.25rem', background: '#f8fafc', borderRadius: '1rem', border: '1px solid #e2e8f0' }}>
                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
                               <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>{new Date(c.created_at).toLocaleString()}</span>
-                              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Cod: {c.validation_code}</span>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <label style={{ fontSize: '0.7rem', color: c.download_released ? '#10b981' : '#64748b', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                  <input 
+                                    type="checkbox" 
+                                    checked={c.download_released} 
+                                    onChange={(e) => handleReleaseDocument('RECEITA', c.id, e.target.checked)}
+                                  />
+                                  {c.download_released ? 'LIBERADO' : 'LIBERAR'}
+                                </label>
+                                <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Cod: {c.validation_code}</span>
+                              </div>
                            </div>
                            <div style={{ fontSize: '0.9rem', color: '#334155', whiteSpace: 'pre-wrap' }}>{c.notes}</div>
                            {c.prescriptions && (
@@ -366,6 +387,7 @@ CID: ${a.cid}
                            )}
                         </div>
                       ))}
+
                       {selectedRecord.record.consultations.length === 0 && <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Nenhuma consulta registrada.</p>}
                    </div>
                 </section>
@@ -382,9 +404,20 @@ CID: ${a.cid}
                               <div style={{ fontWeight: 700 }}>{a.days_off} dia(s) de afastamento</div>
                               <div style={{ fontSize: '0.8rem', color: '#15803d' }}>Emitido em {new Date(a.created_at).toLocaleDateString()} | CID: {a.cid}</div>
                            </div>
-                           <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#166534' }}>{a.code}</div>
+                           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                              <label style={{ fontSize: '0.7rem', color: a.download_released ? '#10b981' : '#64748b', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                <input 
+                                  type="checkbox" 
+                                  checked={a.download_released} 
+                                  onChange={(e) => handleReleaseDocument('ATESTADO', a.id, e.target.checked)}
+                                />
+                                {a.download_released ? 'LIBERADO' : 'LIBERAR'}
+                              </label>
+                              <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#166534' }}>{a.code}</div>
+                           </div>
                         </div>
                       ))}
+
                       {selectedRecord.record.atestados.length === 0 && <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Nenhum atestado emitido.</p>}
                    </div>
                 </section>

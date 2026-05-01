@@ -340,11 +340,12 @@ app.get('/api/patient/history/:cpf', authenticateToken, async (req: any, res) =>
     const { data: patient } = await supabase.from('patients').select('*').eq('cpf', cpf).single();
     if (!patient) return res.status(404).json({ error: 'Não encontrado' });
     if (req.user.role === 'patient' && req.user.id !== patient.id) return res.status(403).json({ error: 'Acesso negado' });
-    const { data: consultations } = await supabase.from('consultations').select('*').eq('patient_id', patient.id).order('created_at', { ascending: false });
-    const { data: atestados } = await supabase.from('atestados').select('*').eq('patient_id', patient.id).order('created_at', { ascending: false });
+    const { data: consultations } = await supabase.from('consultations').select('*, download_released').eq('patient_id', patient.id).order('created_at', { ascending: false });
+    const { data: atestados } = await supabase.from('atestados').select('*, download_released').eq('patient_id', patient.id).order('created_at', { ascending: false });
     res.json({ success: true, patient, consultations, atestados });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
+
 
 app.get('/api/validate-document/:code', validateLimiter, async (req, res) => {
   try {
@@ -358,7 +359,19 @@ app.get('/api/validate-document/:code', validateLimiter, async (req, res) => {
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
+// 3. Document Release Control
+app.post('/api/admin/release-document', authenticateToken, authorizeAdmin, async (req, res) => {
+  try {
+    const { type, id, released } = req.body;
+    const table = type === 'ATESTADO' ? 'atestados' : 'consultations';
+    const { error } = await supabase.from(table).update({ download_released: released }).eq('id', id);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/patient/check-queue/:patientId', async (req, res) => {
+
   try {
     const { patientId } = req.params;
     

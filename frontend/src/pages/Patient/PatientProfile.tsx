@@ -4,7 +4,7 @@ import { useStore } from '../../store/useStore';
 import { 
   Loader2, User, Stethoscope, PenTool, Shield, 
   ArrowLeft, Hash, Mail, Calendar, Download, 
-  Clock, ClipboardList 
+  Clock, ClipboardList, Lock, CheckCircle, Send
 } from 'lucide-react';
 import apiClient from '../../api/client';
 import { openDocument } from '../../utils/s3';
@@ -20,6 +20,7 @@ interface Consultation {
   pdf_path: string;
   receita_pdf_url?: string;
   exames_pdf_url?: string;
+  download_released: boolean;
 }
 
 interface ProfileData {
@@ -46,6 +47,7 @@ interface ProfileData {
     cid: string;
     content: string;
     pdf_url?: string;
+    download_released: boolean;
   }[];
 }
 
@@ -201,7 +203,7 @@ const PatientProfile = () => {
               )}
 
               {data && data.consultations.length === 0 && (
-                <EmptyState icon={<Stethoscope />} text="Nenhuma consulta realizada ainda." />
+                <EmptyState icon={<Stethoscope size={48} />} text="Nenhuma consulta realizada ainda." />
               )}
             </div>
           )}
@@ -211,7 +213,7 @@ const PatientProfile = () => {
             <div>
               <h3 style={{ fontSize: '1.05rem', marginBottom: '1rem' }}>Histórico de Consultas</h3>
               {data && data.consultations.length === 0 ? (
-                <EmptyState icon={<Stethoscope />} text="Você ainda não realizou nenhuma consulta." />
+                <EmptyState icon={<Stethoscope size={48} />} text="Você ainda não realizou nenhuma consulta." />
               ) : (
                 data?.consultations.map(c => <ConsultationCard key={c.id} consultation={c} expanded />)
               )}
@@ -223,7 +225,7 @@ const PatientProfile = () => {
             <div>
               <h3 style={{ fontSize: '1.05rem', marginBottom: '1rem' }}>Receitas & Exames Emitidos</h3>
               {data && data.consultations.filter(c => c.prescriptions || c.exams).length === 0 ? (
-                <EmptyState icon={<PenTool />} text="Nenhuma receita ou exame emitido." />
+                <EmptyState icon={<PenTool size={48} />} text="Nenhuma receita ou exame emitido." />
               ) : (
                 data?.consultations.filter(c => c.prescriptions || c.exams).map(c => (
                   <div key={c.id} style={{
@@ -245,12 +247,7 @@ const PatientProfile = () => {
                             <PenTool size={13} color="var(--accent)" />
                             <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Receita</span>
                           </div>
-                          {c.receita_pdf_url && (
-                             <button className="btn btn-sm" onClick={() => c.receita_pdf_url && openDocument(c.receita_pdf_url)} 
-                               style={{ background: 'var(--accent-ultra-light)', color: 'var(--accent)', border: 'none', fontSize: '0.65rem', padding: '0.2rem 0.5rem', height: 'auto', gap: '0.2rem' }}>
-                               <Download size={10} /> Baixar Receita
-                             </button>
-                          )}
+                          <DownloadButton released={c.download_released} onClick={() => c.receita_pdf_url && openDocument(c.receita_pdf_url)} label="Baixar Receita" />
                         </div>
                         <p style={{ fontSize: '0.85rem', color: 'var(--text-body)', margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{c.prescriptions}</p>
                       </div>
@@ -263,12 +260,7 @@ const PatientProfile = () => {
                             <ClipboardList size={13} color="var(--mint)" />
                             <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--mint)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Exames Solicitados</span>
                           </div>
-                          {c.exames_pdf_url && (
-                             <button className="btn btn-sm" onClick={() => c.exames_pdf_url && openDocument(c.exames_pdf_url)} 
-                               style={{ background: 'var(--mint-light)', color: 'var(--mint)', border: 'none', fontSize: '0.65rem', padding: '0.2rem 0.5rem', height: 'auto', gap: '0.2rem' }}>
-                               <Download size={10} /> Baixar Pedido
-                             </button>
-                          )}
+                          <DownloadButton released={c.download_released} onClick={() => c.exames_pdf_url && openDocument(c.exames_pdf_url)} label="Baixar Pedido" />
                         </div>
                         <p style={{ fontSize: '0.85rem', color: 'var(--text-body)', margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{c.exams}</p>
                       </div>
@@ -279,16 +271,15 @@ const PatientProfile = () => {
             </div>
           )}
 
-          {/* ATESTADOS - SPLIT VIEW REFACTOR */}
+          {/* ATESTADOS */}
           {activeTab === 'atestados' && (
             <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
                 <h3 style={{ fontSize: '1.05rem', margin: 0 }}>Histórico de Atestados</h3>
-                <button className="btn btn-primary btn-sm" style={{ background: 'var(--mint)', color: 'white', border: 'none' }}>Novo Atestado</button>
               </div>
 
               {data && data.atestados.length === 0 ? (
-                <EmptyState icon={<Shield />} text="Nenhum atestado emitido até o momento." />
+                <EmptyState icon={<Shield size={48} />} text="Nenhum atestado emitido até o momento." />
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '1.5rem', flexGrow: 1, minHeight: '500px' }}>
                   
@@ -299,7 +290,7 @@ const PatientProfile = () => {
                         <tr>
                           <th style={{ padding: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Profissional</th>
                           <th style={{ padding: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Data</th>
-                          <th style={{ padding: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, textAlign: 'center' }}>Assinatura</th>
+                          <th style={{ padding: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, textAlign: 'center' }}>Liberação</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -319,13 +310,10 @@ const PatientProfile = () => {
                               <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>CRM {a.doctor_crm}</span>
                             </td>
                             <td style={{ padding: '0.75rem', color: 'var(--text-muted)' }}>
-                              {new Date(a.created_at).toLocaleDateString('pt-BR')} <br />
-                              <span style={{ fontSize: '0.7rem' }}>{new Date(a.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                              {new Date(a.created_at).toLocaleDateString('pt-BR')}
                             </td>
                             <td style={{ padding: '0.75rem', textAlign: 'center' }}>
-                              <div style={{ width: '18px', height: '18px', borderRadius: '50%', background: 'var(--success)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}>
-                                <CheckCircle size={12} />
-                              </div>
+                              {a.download_released ? <CheckCircle size={16} color="var(--success)" /> : <Lock size={16} color="#94a3b8" />}
                             </td>
                           </tr>
                         ))}
@@ -350,7 +338,6 @@ const PatientProfile = () => {
                                 <div style={{ width: '250px', borderBottom: '1px solid #000', margin: '0 auto 0.5rem auto' }}></div>
                                 <div style={{ fontSize: '0.9rem', fontWeight: 700 }}>Dr(a). {selectedAtestado.doctor_name}</div>
                                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>CRM {selectedAtestado.doctor_crm}</div>
-                                <div style={{ fontSize: '0.7rem', color: 'var(--success)', fontWeight: 700, marginTop: '0.5rem' }}>Assinado digitalmente via MedPronto</div>
                              </div>
 
                              <div style={{ position: 'absolute', bottom: '1rem', right: '1rem', fontSize: '0.65rem', color: 'var(--text-faint)', fontFamily: 'monospace' }}>
@@ -366,9 +353,12 @@ const PatientProfile = () => {
 
                      {/* FOOTER ACTIONS */}
                      <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                        <button className="btn btn-outline btn-sm" style={{ gap: '0.3rem', color: 'var(--accent)' }}><Mail size={14} /> E-mail</button>
-                        <button className="btn btn-outline btn-sm" style={{ gap: '0.3rem' }} onClick={() => window.print()}><Download size={14} /> Imprimir</button>
-                        <button className="btn btn-primary btn-sm" style={{ gap: '0.3rem', background: '#25D366', border: 'none' }}><Send size={14} /> WhatsApp</button>
+                        <DownloadButton 
+                          released={selectedAtestado?.download_released} 
+                          onClick={() => selectedAtestado?.pdf_url && openDocument(selectedAtestado.pdf_url)} 
+                          label="Baixar PDF do Atestado" 
+                          variant="primary"
+                        />
                      </div>
                   </div>
 
@@ -385,6 +375,31 @@ const PatientProfile = () => {
 };
 
 /* ===== SUB-COMPONENTS ===== */
+
+const DownloadButton = ({ released, onClick, label, variant = 'outline' }: any) => {
+  if (!released) {
+    return (
+      <div style={{ 
+        display: 'flex', alignItems: 'center', gap: '0.4rem', 
+        padding: '0.4rem 0.75rem', borderRadius: '0.5rem', 
+        background: '#f1f5f9', color: '#64748b', fontSize: '0.7rem', 
+        fontWeight: 700, border: '1px solid #e2e8f0', cursor: 'not-allowed'
+      }}>
+        <Lock size={12} /> Aguardando Liberação
+      </div>
+    );
+  }
+
+  return (
+    <button 
+      onClick={onClick}
+      className={`btn btn-${variant} btn-sm`} 
+      style={{ gap: '0.4rem', padding: '0.4rem 0.75rem', height: 'auto', fontSize: '0.75rem' }}
+    >
+      <Download size={14} /> {label}
+    </button>
+  );
+};
 
 const InfoPill = ({ icon, text }: { icon: React.ReactNode; text: string }) => (
   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
@@ -424,17 +439,8 @@ const ConsultationCard = ({ consultation, expanded }: { consultation: Consultati
         <Clock size={13} color="var(--text-muted)" />
         <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{new Date(consultation.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
         <span style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--accent)' }}>Dr(a). {consultation.doctor_name}</span>
-        <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>CRM {consultation.doctor_crm}</span>
       </div>
-      {consultation.pdf_path && (
-        <button
-          className="btn btn-outline btn-sm"
-          onClick={() => openDocument(consultation.pdf_path)}
-          style={{ gap: '0.25rem' }}
-        >
-          <Download size={11} /> PDF
-        </button>
-      )}
+      <DownloadButton released={consultation.download_released} onClick={() => consultation.pdf_path && openDocument(consultation.pdf_path)} label="PDF" />
     </div>
 
     {expanded && (
@@ -445,18 +451,6 @@ const ConsultationCard = ({ consultation, expanded }: { consultation: Consultati
             <p style={{ fontSize: '0.83rem', color: 'var(--text-body)', margin: '0.15rem 0 0', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{consultation.notes}</p>
           </div>
         )}
-        {consultation.prescriptions && (
-          <div style={{ marginBottom: '0.45rem' }}>
-            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase' }}>Prescrição</span>
-            <p style={{ fontSize: '0.83rem', color: 'var(--text-body)', margin: '0.15rem 0 0', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{consultation.prescriptions}</p>
-          </div>
-        )}
-        {consultation.exams && (
-          <div>
-            <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--mint)', textTransform: 'uppercase' }}>Exames</span>
-            <p style={{ fontSize: '0.83rem', color: 'var(--text-body)', margin: '0.15rem 0 0', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{consultation.exams}</p>
-          </div>
-        )}
       </div>
     )}
   </div>
@@ -465,7 +459,7 @@ const ConsultationCard = ({ consultation, expanded }: { consultation: Consultati
 const EmptyState = ({ icon, text }: { icon: React.ReactNode; text: string }) => (
   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '3rem 0', color: 'var(--text-muted)' }}>
     <div style={{ opacity: 0.25, marginBottom: '0.6rem' }}>
-        {React.isValidElement(icon) ? React.cloneElement(icon as React.ReactElement<any>, { size: 48 }) : icon}
+        {icon}
     </div>
     <p style={{ fontSize: '0.9rem', margin: 0 }}>{text}</p>
   </div>
