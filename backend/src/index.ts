@@ -267,9 +267,22 @@ app.get('/api/validate-document/:code', validateLimiter, async (req, res) => {
 app.get('/api/patient/check-queue/:patientId', async (req, res) => {
   try {
     const { patientId } = req.params;
+    
+    // 1. Check if patient is in the waiting queue
     const { data: queueEntry } = await supabase.from('queue').select('*').eq('patient_id', patientId).eq('status', 'waiting').single();
-    if (queueEntry) return res.json({ inQueue: true, entry: queueEntry });
-    res.json({ inQueue: false });
+    
+    // 2. Check if patient has an active consultation (doctor called)
+    const { data: activeConsultation } = await supabase.from('consultations').select('*').eq('patient_id', patientId).eq('status', 'active').single();
+
+    if (activeConsultation) {
+      return res.json({ isActive: true, inQueue: false, roomId: patientId });
+    }
+    
+    if (queueEntry) {
+      return res.json({ inQueue: true, isActive: false, entry: queueEntry });
+    }
+
+    res.json({ inQueue: false, isActive: false });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
