@@ -78,8 +78,8 @@ const PatientDashboard = () => {
 
 
     s.on('consultation_ended', (data) => {
-      if (data?.pdf_url) openDocument(data.pdf_url);
-      alert("Sua consulta terminou. Seu prontuário foi salvo.");
+      alert("Sua consulta terminou com sucesso! Você pode visualizar seu atestado e receita no seu perfil.");
+      navigate('/patient/profile?tab=atestados');
       setInQueue(false);
       setConsultationReady(false);
     });

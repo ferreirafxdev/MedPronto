@@ -24,4 +24,7 @@ export const config = {
     bucket: getEnv('S3_BUCKET', 's3'),
   },
   corsOrigin: getEnv('CORS_ORIGIN', 'http://localhost:5173'),
+  redis: {
+    url: process.env.REDIS_URL || 'redis://localhost:6379',
+  }
 };

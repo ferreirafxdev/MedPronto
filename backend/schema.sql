@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS atestados (
     doctor_crm TEXT,
     days_off INTEGER,
     cid TEXT,
+    content TEXT, -- Digital content for dynamic preview
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -39,10 +40,12 @@ CREATE TABLE IF NOT EXISTS consultations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     patient_id UUID REFERENCES patients(id),
     doctor_id UUID REFERENCES doctors(id),
-    pdf_path TEXT, -- URL to PDF file
+    pdf_path TEXT, -- URL to PDF file (optional now)
     notes TEXT,
     prescriptions TEXT,
     exams TEXT,
+    content TEXT, -- Full digital content
+    validation_code TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 

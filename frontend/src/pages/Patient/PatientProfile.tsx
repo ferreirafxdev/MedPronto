@@ -36,8 +36,19 @@ interface ProfileData {
     lastVisit: string;
   };
   consultations: Consultation[];
-  atestados: any[];
+  atestados: {
+    id: string;
+    code: string;
+    created_at: string;
+    doctor_name: string;
+    doctor_crm: string;
+    days_off: number;
+    cid: string;
+    content: string;
+    pdf_url?: string;
+  }[];
 }
+
 
 const PatientProfile = () => {
   const { user } = useStore();
@@ -45,6 +56,8 @@ const PatientProfile = () => {
   const [data, setData] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'consultas' | 'receitas' | 'atestados'>('overview');
+  const [selectedAtestado, setSelectedAtestado] = useState<any>(null);
+
 
   useEffect(() => {
     if (!user || user.role !== 'patient') {
@@ -60,7 +73,11 @@ const PatientProfile = () => {
       const resp = await apiClient.get(`/api/patient/history/${user?.cpf}`);
       if (resp.data.success) {
         setData(resp.data);
+        if (resp.data.atestados.length > 0) {
+          setSelectedAtestado(resp.data.atestados[0]);
+        }
       }
+
     } catch (err) {
       console.error("Erro ao buscar perfil:", err);
     } finally {
@@ -262,56 +279,104 @@ const PatientProfile = () => {
             </div>
           )}
 
-          {/* ATESTADOS */}
+          {/* ATESTADOS - SPLIT VIEW REFACTOR */}
           {activeTab === 'atestados' && (
-            <div>
-              <h3 style={{ fontSize: '1.05rem', marginBottom: '1rem' }}>Atestados Emitidos</h3>
+            <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                <h3 style={{ fontSize: '1.05rem', margin: 0 }}>Histórico de Atestados</h3>
+                <button className="btn btn-primary btn-sm" style={{ background: 'var(--mint)', color: 'white', border: 'none' }}>Novo Atestado</button>
+              </div>
+
               {data && data.atestados.length === 0 ? (
                 <EmptyState icon={<Shield />} text="Nenhum atestado emitido até o momento." />
               ) : (
-                data?.atestados.map(a => (
-                  <div key={a.id} style={{
-                    background: 'var(--bg-subtle)', padding: '1.1rem', borderRadius: 'var(--radius-lg)',
-                    border: '1px solid var(--border)', marginBottom: '0.65rem',
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  }}>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.3rem' }}>
-                        <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-heading)' }}>{a.days_off} dia(s) de afastamento</span>
-                        {a.cid && <span className="status-badge" style={{ background: 'var(--violet-light)', color: 'var(--violet)', fontSize: '0.62rem' }}>CID: {a.cid}</span>}
-                      </div>
-                      <div style={{ display: 'flex', gap: '0.85rem', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                          <Stethoscope size={11} style={{ verticalAlign: 'middle', marginRight: '0.2rem' }} />
-                          Dr(a). {a.doctor_name} — CRM {a.doctor_crm}
-                        </span>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                          <Calendar size={11} style={{ verticalAlign: 'middle', marginRight: '0.2rem' }} />
-                          {new Date(a.created_at).toLocaleDateString('pt-BR')}
-                        </span>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexShrink: 0 }}>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginBottom: '0.15rem' }}>CÓDIGO</div>
-                        <span style={{
-                          display: 'inline-block', padding: '0.3rem 0.6rem',
-                          background: 'var(--accent-ultra-light)', color: 'var(--accent)',
-                          borderRadius: 'var(--radius-sm)', fontWeight: 700, fontSize: '0.78rem',
-                          fontFamily: 'monospace', letterSpacing: '0.04em',
-                        }}>{a.code}</span>
-                      </div>
-                      {a.pdf_url && (
-                        <button className="btn btn-primary btn-sm" onClick={() => openDocument(a.pdf_url)} style={{ height: '38px', gap: '0.3rem', padding: '0 0.8rem' }}>
-                          <Download size={14} /> PDF
-                        </button>
-                      )}
-                    </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '1.5rem', flexGrow: 1, minHeight: '500px' }}>
+                  
+                  {/* LEFT: LIST OF CERTIFICATES */}
+                  <div style={{ borderRight: '1px solid var(--border)', paddingRight: '1rem', overflowY: 'auto', maxHeight: '600px' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                      <thead style={{ background: 'var(--bg-subtle)', textAlign: 'left' }}>
+                        <tr>
+                          <th style={{ padding: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Profissional</th>
+                          <th style={{ padding: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>Data</th>
+                          <th style={{ padding: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, textAlign: 'center' }}>Assinatura</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data?.atestados.map(a => (
+                          <tr 
+                            key={a.id} 
+                            onClick={() => setSelectedAtestado(a)}
+                            style={{ 
+                              cursor: 'pointer', 
+                              borderBottom: '1px solid var(--border)',
+                              background: selectedAtestado?.id === a.id ? 'var(--mint-light)' : 'transparent',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            <td style={{ padding: '0.75rem', fontWeight: 500 }}>
+                              {a.doctor_name} <br />
+                              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>CRM {a.doctor_crm}</span>
+                            </td>
+                            <td style={{ padding: '0.75rem', color: 'var(--text-muted)' }}>
+                              {new Date(a.created_at).toLocaleDateString('pt-BR')} <br />
+                              <span style={{ fontSize: '0.7rem' }}>{new Date(a.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                            </td>
+                            <td style={{ padding: '0.75rem', textAlign: 'center' }}>
+                              <div style={{ width: '18px', height: '18px', borderRadius: '50%', background: 'var(--success)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}>
+                                <CheckCircle size={12} />
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                ))
+
+                  {/* RIGHT: PREVIEW AREA */}
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                     <div style={{ flexGrow: 1, background: '#fff', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '2rem', boxShadow: 'inset 0 0 10px rgba(0,0,0,0.02)', position: 'relative' }}>
+                        {selectedAtestado ? (
+                          <div className="certificate-content" style={{ fontFamily: 'serif', color: '#1e293b', lineHeight: 1.8 }}>
+                             <div style={{ textAlign: 'center', marginBottom: '2.5rem', borderBottom: '2px solid var(--mint)', pb: '1rem' }}>
+                                <h2 style={{ fontSize: '1.5rem', color: 'var(--navy-dark)', letterSpacing: '0.1em' }}>ATESTADO MÉDICO</h2>
+                             </div>
+                             
+                             <div style={{ whiteSpace: 'pre-wrap', fontSize: '1rem' }}>
+                                {selectedAtestado.content || `Atesto para os devidos fins que o(a) Sr(a). ${data?.patient.name}, portador(a) do CPF ${data?.patient.cpf}, foi atendido(a) em consulta médica nesta data, devendo permanecer em repouso por um período de ${selectedAtestado.days_off} dia(s) a partir desta data.\n\nCID: ${selectedAtestado.cid || 'Não informado'}`}
+                             </div>
+
+                             <div style={{ marginTop: '4rem', textAlign: 'center' }}>
+                                <div style={{ width: '250px', borderBottom: '1px solid #000', margin: '0 auto 0.5rem auto' }}></div>
+                                <div style={{ fontSize: '0.9rem', fontWeight: 700 }}>Dr(a). {selectedAtestado.doctor_name}</div>
+                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>CRM {selectedAtestado.doctor_crm}</div>
+                                <div style={{ fontSize: '0.7rem', color: 'var(--success)', fontWeight: 700, marginTop: '0.5rem' }}>Assinado digitalmente via MedPronto</div>
+                             </div>
+
+                             <div style={{ position: 'absolute', bottom: '1rem', right: '1rem', fontSize: '0.65rem', color: 'var(--text-faint)', fontFamily: 'monospace' }}>
+                                CÓDIGO DE VALIDAÇÃO: {selectedAtestado.code}
+                             </div>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
+                             Selecione um atestado para visualizar
+                          </div>
+                        )}
+                     </div>
+
+                     {/* FOOTER ACTIONS */}
+                     <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                        <button className="btn btn-outline btn-sm" style={{ gap: '0.3rem', color: 'var(--accent)' }}><Mail size={14} /> E-mail</button>
+                        <button className="btn btn-outline btn-sm" style={{ gap: '0.3rem' }} onClick={() => window.print()}><Download size={14} /> Imprimir</button>
+                        <button className="btn btn-primary btn-sm" style={{ gap: '0.3rem', background: '#25D366', border: 'none' }}><Send size={14} /> WhatsApp</button>
+                     </div>
+                  </div>
+
+                </div>
               )}
             </div>
           )}
+
 
         </main>
       </div>

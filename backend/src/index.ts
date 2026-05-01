@@ -18,6 +18,8 @@ import { config } from './config';
 import dns from 'dns';
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { patientQueue, documentQueue } from './queue';
+
 
 // Fix for Supabase IPv6 connection issues (EAI_AGAIN)
 dns.setDefaultResultOrder('ipv4first');
@@ -359,26 +361,31 @@ app.post('/api/payment/pix-simulate', async (req, res) => {
   }
 });
 
-// 1. Patient enqueue
+// 1. Patient enqueue (using BullMQ)
 app.post('/api/enqueue', async (req, res) => {
   try {
     const { id, name, complaint } = req.body;
     
-    // Insert into DB queue
-    const [q] = await sql`
+    // Add to Redis Queue via BullMQ
+    await patientQueue.add('patient-waiting', { id, name, complaint });
+
+    // Sync with SQL for persistence/history if needed, 
+    // but for active queue we rely on Redis
+    await sql`
       INSERT INTO queue (patient_id, name, complaint, status)
       VALUES (${id}, ${name}, ${complaint}, 'waiting')
-      RETURNING *
+      ON CONFLICT (patient_id) DO UPDATE SET status = 'waiting', created_at = NOW()
     `;
 
     // Broadcast queue update
     io.emit('queue_updated');
 
-    res.json({ success: true, patient: q });
+    res.json({ success: true, message: 'Adicionado à fila' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // 2. Doctor: Get Queue
 app.get('/api/queue', async (req, res) => {
@@ -414,7 +421,7 @@ app.get('/api/patient/check-queue/:patientId', async (req, res) => {
   }
 });
 
-// 3. Doctor: Take Patient
+// 3. Doctor: Take Patient (using BullMQ / Atomic SQL)
 app.post('/api/take-patient', async (req, res) => {
   try {
     const { doctorId } = req.body;
@@ -435,6 +442,10 @@ app.post('/api/take-patient', async (req, res) => {
 
     if (!patient) return res.status(404).json({ error: 'Fila vazia' });
 
+    // Remove from BullMQ active queue if we were using it for "waiting" state exclusively
+    // (BullMQ jobs are usually processed by workers, but here we use SQL as the "source of truth" 
+    // for complex state transitions while Redis handles the "speed" of notifications)
+    
     io.emit('queue_updated');
     res.json({ success: true, patient: { ...patient, id: patient.patient_id, roomId: patient.patient_id } });
   } catch (err: any) {
@@ -442,10 +453,11 @@ app.post('/api/take-patient', async (req, res) => {
   }
 });
 
-// 4. End Consultation & Generate PDF
+
+// 4. End Consultation & Save Digital Content
 app.post('/api/end-consultation', authenticateToken, authorizeDoctor, async (req, res) => {
   try {
-    const { patientId, doctorId, notes, prescriptions, exams } = req.body;
+    const { patientId, doctorId, notes, prescriptions, exams, content } = req.body;
 
     const [patient] = await sql`
         SELECT q.*, p.cpf, p.birth_date 
@@ -456,76 +468,43 @@ app.post('/api/end-consultation', authenticateToken, authorizeDoctor, async (req
     `;
     if (!patient) return res.status(404).json({ error: 'Consulta não encontrada' });
 
-    // Fetch doctor data from Neon
-    const docResults = await sql`SELECT * FROM doctors WHERE id = ${doctorId} LIMIT 1`;
-    const doctor = docResults[0];
-    if (!doctor) return res.status(404).json({ error: 'Dados do médico não encontrados.' });
-
      const validationCode = `MP-R-${uuidv4().substring(0, 8).toUpperCase()}`;
 
-    const template = new PDFTemplate();
-    const doc = template.getDocument();
-    const buffers: Buffer[] = [];
-    doc.on('data', buffers.push.bind(buffers));
-
-    template.drawLayout('Resumo da Consulta de Telemedicina');
-    
-    template.addContent(`PACIENTE: ${patient.name.toUpperCase()}\nCPF: ${patient.cpf}\nDATA: ${new Date().toLocaleDateString('pt-BR')}`);
-    
-    template.addSection('Motivo da Consulta', patient.complaint);
-    template.addSection('Anamnese e Evolução', notes);
-    template.addSection('Prescrição de Conduta', prescriptions);
-    if (exams) template.addSection('Exames Solicitados', exams);
-
-    template.finalizeWithFooter(doctor.name, doctor.crm, validationCode);
-
-    const pdfBuffer = await new Promise<Buffer>((resolve) => {
-      doc.on('end', () => resolve(Buffer.concat(buffers)));
-    });
-
-    // --- Bird ID Digital Signature Step ---
-    const birdIdToken = await BirdIdService.authenticate();
-    if (birdIdToken) {
-      console.log('✅ Autorização Bird ID obtida. Assinando prontuário...');
-      // Simulação de assinatura do documento
-      await BirdIdService.signHash(patientId, birdIdToken);
-    }
-
-    // Save to S3 (Supabase S3 API)
-    const filePath = `prontuarios/${patientId}_${Date.now()}.pdf`;
-    let pdfUrl = '';
-
-    try {
-      pdfUrl = await uploadPDF(s3.bucket, filePath, pdfBuffer);
-      console.log(`✅ Prontuário salvo no S3: ${pdfUrl}`);
-    } catch (error: any) {
-      console.error("Erro no S3 Upload:", error.message);
-      // Fallback or handle error
-    }
-
-    // Save metadata in DB with validation code
+    // Save metadata and content in DB immediately
     await sql`
-        INSERT INTO consultations (patient_id, doctor_id, notes, prescriptions, exams, pdf_path, validation_code)
-        VALUES (${patient.patient_id}, ${doctorId}, ${notes}, ${prescriptions}, ${exams}, ${pdfUrl}, ${validationCode})
+        INSERT INTO consultations (patient_id, doctor_id, notes, prescriptions, exams, content, validation_code)
+        VALUES (${patient.patient_id}, ${doctorId}, ${notes}, ${prescriptions}, ${exams}, ${content}, ${validationCode})
     `;
+
+    // Offload PDF generation to background worker
+    await documentQueue.add('generate-consultation-pdf', {
+      type: 'CONSULTATION',
+      patientId,
+      doctorId,
+      notes,
+      prescriptions,
+      exams,
+      validationCode
+    });
 
     // Finalize: Remove from DB Queue
     await sql`DELETE FROM queue WHERE patient_id = ${patientId}`;
 
-    // Notify Patient via socket with PDF Download URL
-    io.to(patientId).emit('consultation_ended', { pdf_url: pdfUrl });
+    // Notify Patient via socket
+    io.to(patientId).emit('consultation_ended', { success: true });
 
-    res.json({ success: true, message: 'Consulta encerrada e PDF salvo no S3', pdf_url: pdfUrl });
+    res.json({ success: true, message: 'Atendimento finalizado com sucesso.' });
   } catch (err: any) {
     console.error("Erro fatal ao encerrar:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// 5. Generate Medical Certificate (Atestado)
+
+// 5. Generate Medical Certificate (Digital First)
 app.post('/api/atestado', authenticateToken, authorizeDoctor, async (req, res) => {
   try {
-    const { patientId, doctorId, daysOff, cid } = req.body;
+    const { patientId, doctorId, daysOff, cid, content } = req.body;
 
     const [patient] = await sql`
         SELECT q.*, p.cpf, p.birth_date 
@@ -536,49 +515,35 @@ app.post('/api/atestado', authenticateToken, authorizeDoctor, async (req, res) =
     `;
     if (!patient) return res.status(404).json({ error: 'Paciente não encontrado na sessão ativa.' });
 
-    // Fetch doctor data for CRM and real Name from Neon
-    const docResults = await sql`SELECT * FROM doctors WHERE id = ${doctorId} LIMIT 1`;
-    const doctor = docResults[0];
+    const [doctor] = await sql`SELECT * FROM doctors WHERE id = ${doctorId} LIMIT 1`;
     if (!doctor) return res.status(404).json({ error: 'Dados do médico não encontrados.' });
 
     const validationCode = `MP-${uuidv4().substring(0, 8).toUpperCase()}`;
     const days = parseInt(daysOff) || 1;
 
-    // 2. Save to DB first
+    // Save to DB (Digital History)
     await sql`
-        INSERT INTO atestados (code, patient_id, doctor_id, days_off, cid, patient_name, doctor_name, doctor_crm)
-        VALUES (${validationCode}, ${patientId}, ${doctorId}, ${days}, ${cid || null}, ${patient.name}, ${doctor.name}, ${doctor.crm})
+        INSERT INTO atestados (code, patient_id, doctor_id, days_off, cid, content, patient_name, doctor_name, doctor_crm)
+        VALUES (${validationCode}, ${patientId}, ${doctorId}, ${days}, ${cid || null}, ${content}, ${patient.name}, ${doctor.name}, ${doctor.crm})
     `;
 
-    const template = new PDFTemplate();
-    const doc = template.getDocument();
-    const buffers: Buffer[] = [];
-    doc.on('data', buffers.push.bind(buffers));
-
-    template.drawLayout('Atestado Médico');
-    
-    const atestadoContent = `Atesto para os devidos fins que o(a) Sr(a). ${patient.name}, portador(a) do CPF ${patient.cpf}, foi atendido(a) em consulta médica nesta data, devendo permanecer em repouso por um período de ${days} dia(s) a partir desta data.\n\nCID: ${cid || 'Não informado'}\nCódigo de Validação: ${validationCode}`;
-
-    template.addSection('Declaração de Comparecimento / Repouso', atestadoContent);
-    template.finalizeWithFooter(doctor.name, doctor.crm, validationCode);
-
-    const pdfBuffer = await new Promise<Buffer>((resolve) => {
-      doc.on('end', () => resolve(Buffer.concat(buffers)));
+    // Add background task for PDF and Signing
+    await documentQueue.add('process-atestado', {
+      type: 'ATESTADO',
+      patientId,
+      doctorId,
+      validationCode,
+      daysOff: days,
+      cid,
+      content
     });
 
-    const filePath = `atestados/${patientId}_${validationCode}.pdf`;
-    let pdfUrl = '';
-    try {
-      pdfUrl = await uploadPDF(s3.bucket, filePath, pdfBuffer);
-    } catch (e) {
-      console.error("Erro upload atestado:", e);
-    }
-
-    res.json({ success: true, code: validationCode, pdf_url: pdfUrl });
+    res.json({ success: true, code: validationCode, message: 'Atestado emitido e salvo no histórico.' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
+
 // 6. Unified Document Validation
 app.get('/api/validate-document/:code', async (req, res) => {
   try {

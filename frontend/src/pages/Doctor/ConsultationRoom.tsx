@@ -23,6 +23,10 @@ const ConsultationRoom = () => {
   const [newMessage, setNewMessage] = useState('');
   const [socket, setSocket] = useState<any>(null);
   const [consultationTime, setConsultationTime] = useState(0);
+  const [atestadoContent, setAtestadoContent] = useState('');
+  const [atestadoModel, setAtestadoModel] = useState('padrão');
+  const [prescriptionContent, setPrescriptionContent] = useState('');
+
 
   useEffect(() => { const t = setInterval(() => setConsultationTime(p => p + 1), 1000); return () => clearInterval(t); }, []);
   const formatTime = (s: number) => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
@@ -36,6 +40,26 @@ const ConsultationRoom = () => {
     s.on('receive_message', (data: any) => { setMessages(prev => [...prev, { sender: data.sender, text: data.text, time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) }]); });
     return () => { s.disconnect(); };
   }, [roomId, user, navigate]);
+
+  useEffect(() => {
+    if (activeTab === 'atestado' && !atestadoContent) {
+      updateAtestadoModel('padrão');
+    }
+    if (activeTab === 'receituario' && !prescriptionContent) {
+      setPrescriptionContent(`RECEITUÁRIO MÉDICO\n\nPaciente: ${user?.name}\nData: ${new Date().toLocaleDateString('pt-BR')}\n\nPrescrição:\n1. `);
+    }
+  }, [activeTab]);
+
+  const updateAtestadoModel = (model: string) => {
+    setAtestadoModel(model);
+    const date = new Date().toLocaleDateString('pt-BR');
+    if (model === 'padrão') {
+      setAtestadoContent(`ATESTADO MÉDICO\n\nAtesto para os devidos fins que o(a) Sr(a). ${user?.name}, foi atendido(a) em consulta médica nesta data, devendo permanecer em repouso por um período de ${daysOff} dia(s) a partir desta data.\n\nCID: ${cid || 'Não informado'}\n\nManaus, ${date}.`);
+    } else if (model === 'comparecimento') {
+      setAtestadoContent(`DECLARAÇÃO DE COMPARECIMENTO\n\nDeclaro para os devidos fins que o(a) Sr(a). ${user?.name}, compareceu a este serviço de saúde para atendimento médico no dia ${date}.`);
+    }
+  };
+
 
   const sendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,16 +112,39 @@ const ConsultationRoom = () => {
     }
   };
 
+  const emitAtestado = async () => {
+    setLoading(true);
+    try {
+      await apiClient.post('/api/atestado', { 
+        patientId: roomId, 
+        doctorId: user?.id, 
+        daysOff, 
+        cid, 
+        content: atestadoContent 
+      });
+      alert("✅ Atestado liberado e salvo no histórico do paciente!");
+      setActiveTab('evolucao');
+    } catch (err) { alert("Erro ao emitir atestado."); } finally { setLoading(false); }
+  };
+
   const endConsultation = async () => {
-    if(window.confirm("Deseja encerrar e gerar o PDF?")) {
+    if(window.confirm("Deseja encerrar o atendimento? Os documentos serão salvos no histórico do paciente.")) {
       setLoading(true);
       try {
-        const r = await apiClient.post('/api/end-consultation', { patientId: roomId, doctorId: user?.id, notes, prescriptions, exams });
-        if(r.data.pdf_url) openDocument(r.data.pdf_url);
-        alert("✅ Atendimento finalizado!"); navigate('/doctor/dashboard');
+        await apiClient.post('/api/end-consultation', { 
+          patientId: roomId, 
+          doctorId: user?.id, 
+          notes, 
+          prescriptions: prescriptions || prescriptionContent, 
+          exams,
+          content: prescriptionContent // Saving the digital prescription content
+        });
+        alert("✅ Atendimento finalizado com sucesso!"); 
+        navigate('/doctor/dashboard');
       } catch(err) { alert("Erro ao encerrar."); } finally { setLoading(false); }
     }
   };
+
 
   const roomName = `MedProntoRoom_Doc_${user?.id?.replace(/[^a-zA-Z0-9]/g, '')}`;
 
@@ -190,16 +237,17 @@ const ConsultationRoom = () => {
             )}
             {activeTab === 'receituario' && (
               <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <SectionHeader icon={PenTool} title="Receituário" desc="Prescrição digital assinada." />
-                <textarea className="form-control" style={{ flexGrow: 1, resize: 'none', border: '1px solid #f1f5f9', background: '#f8fafc', padding: '1rem', borderRadius: '1rem' }} value={prescriptions} onChange={e=>setPrescriptions(e.target.value)} placeholder="1. ..." />
+                <SectionHeader icon={PenTool} title="Receituário" desc="Prescrição digital." />
+                <textarea className="form-control" style={{ flexGrow: 1, resize: 'none', border: '1px solid #f1f5f9', background: '#f8fafc', padding: '1rem', borderRadius: '1rem', fontFamily: 'monospace', fontSize: '0.85rem' }} value={prescriptionContent} onChange={e=>setPrescriptionContent(e.target.value)} placeholder="Digite a prescrição..." />
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginTop: '1rem' }}>
-                  <button className="btn btn-outline btn-sm" onClick={() => downloadPDF('receita', { prescriptions }, 'receita.pdf')} disabled={loading}>Rascunho</button>
+                  <button className="btn btn-outline btn-sm" onClick={() => downloadPDF('receita', { prescriptions: prescriptionContent }, 'receita.pdf')} disabled={loading}>Download PDF</button>
                   <button className="btn btn-primary btn-sm" onClick={startDigitalSignature} disabled={loading || signingStatus === 'signed'}>
                     {signingStatus === 'signed' ? 'Assinado ✅' : 'Assinar Bird ID'}
                   </button>
                 </div>
               </div>
             )}
+
             {activeTab === 'exames' && (
               <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                 <SectionHeader icon={ClipboardList} title="Pedidos de Exame" desc="Solicitações laboratoriais." />
@@ -210,13 +258,38 @@ const ConsultationRoom = () => {
             {activeTab === 'atestado' && (
               <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                 <SectionHeader icon={FileText} title="Atestado Médico" desc="Afastamento e justificativa." />
-                <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '1rem', border: '1px solid #f1f5f9', marginBottom: '1rem' }}>
-                   <div className="form-group"><label style={{ fontSize: '0.7rem', fontWeight: 700 }}>DIAS</label><input type="number" className="form-control" value={daysOff} onChange={e=>setDaysOff(e.target.value)} /></div>
-                   <div className="form-group" style={{ marginTop: '0.75rem' }}><label style={{ fontSize: '0.7rem', fontWeight: 700 }}>CID</label><input type="text" className="form-control" value={cid} onChange={e=>setCid(e.target.value)} placeholder="Ex: J06" /></div>
+                
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                  <select 
+                    className="form-control" 
+                    style={{ fontSize: '0.75rem', height: '36px', padding: '0 0.5rem' }}
+                    value={atestadoModel}
+                    onChange={(e) => updateAtestadoModel(e.target.value)}
+                  >
+                    <option value="padrão">Atestado Padrão</option>
+                    <option value="comparecimento">Declaração de Comparecimento</option>
+                  </select>
                 </div>
-                <button className="btn btn-primary btn-sm" onClick={() => downloadPDF('atestado', { daysOff, cid }, 'atestado.pdf')} disabled={loading}>Emitir Atestado</button>
+
+                <div style={{ background: '#f8fafc', padding: '0.75rem', borderRadius: '1rem', border: '1px solid #f1f5f9', marginBottom: '0.75rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                   <div className="form-group" style={{ margin: 0 }}><label style={{ fontSize: '0.65rem', fontWeight: 700 }}>DIAS</label><input type="number" className="form-control" style={{ height: '32px' }} value={daysOff} onChange={e=>setDaysOff(e.target.value)} /></div>
+                   <div className="form-group" style={{ margin: 0 }}><label style={{ fontSize: '0.65rem', fontWeight: 700 }}>CID</label><input type="text" className="form-control" style={{ height: '32px' }} value={cid} onChange={e=>setCid(e.target.value)} placeholder="Ex: J06" /></div>
+                </div>
+
+                <textarea 
+                  className="form-control" 
+                  style={{ flexGrow: 1, resize: 'none', border: '1px solid #f1f5f9', background: '#f8fafc', padding: '1rem', borderRadius: '1rem', fontFamily: 'monospace', fontSize: '0.85rem' }} 
+                  value={atestadoContent} 
+                  onChange={e=>setAtestadoContent(e.target.value)} 
+                />
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginTop: '1rem' }}>
+                  <button className="btn btn-outline btn-sm" onClick={() => downloadPDF('atestado', { daysOff, cid }, 'atestado.pdf')} disabled={loading}>Download PDF</button>
+                  <button className="btn btn-primary btn-sm" onClick={emitAtestado} disabled={loading}>Liberar no Perfil</button>
+                </div>
               </div>
             )}
+
           </div>
 
           <div style={{ padding: '1.25rem', borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
