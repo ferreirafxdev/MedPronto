@@ -200,16 +200,22 @@ app.post('/api/enqueue', authenticateToken, async (req: any, res) => {
       console.warn('[Queue] Redis warning (continuing with DB):', redisErr);
     }
 
-    // Upsert in Supabase
-    const { error } = await supabase
-      .from('queue')
-      .upsert({ 
-        patient_id: id, 
-        name, 
-        complaint, 
-        status: 'waiting', 
-        created_at: new Date().toISOString() 
-      }, { onConflict: 'patient_id' });
+    // Safter logic than upsert: Check then Insert or Update
+    const { data: existing } = await supabase.from('queue').select('id').eq('patient_id', id).maybeSingle();
+
+    let error;
+    if (existing) {
+      const { error: updateError } = await supabase
+        .from('queue')
+        .update({ name, complaint, status: 'waiting', created_at: new Date().toISOString() })
+        .eq('patient_id', id);
+      error = updateError;
+    } else {
+      const { error: insertError } = await supabase
+        .from('queue')
+        .insert([{ patient_id: id, name, complaint, status: 'waiting', created_at: new Date().toISOString() }]);
+      error = insertError;
+    }
 
     if (error) {
       console.error('[Queue] Supabase Error:', error);
@@ -218,6 +224,7 @@ app.post('/api/enqueue', authenticateToken, async (req: any, res) => {
 
     console.log(`[Queue] ${name} successfully added to queue`);
     res.json({ success: true, message: 'Adicionado à fila' });
+
   } catch (err: any) { 
     console.error('[Queue] Internal Error:', err);
     res.status(500).json({ error: err.message }); 
