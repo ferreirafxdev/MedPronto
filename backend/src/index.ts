@@ -187,13 +187,43 @@ app.post('/api/admin/auth', async (req, res) => {
 app.post('/api/enqueue', authenticateToken, async (req: any, res) => {
   try {
     const { id, name, complaint } = req.body;
-    if (req.user.role === 'patient' && req.user.id !== id) return res.status(403).json({ error: 'Não autorizado' });
-    await patientQueue.add('patient-waiting', { id, name, complaint });
-    const { error } = await supabase.from('queue').upsert({ patient_id: id, name, complaint, status: 'waiting', created_at: new Date().toISOString() }, { onConflict: 'patient_id' });
-    if (error) return res.status(500).json({ error: error.message });
-    res.json({ success: true, message: 'Adicionado' });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+    console.log(`[Queue] Enqueue request for ${name} (${id})`);
+    
+    if (req.user.role === 'patient' && req.user.id !== id) {
+      return res.status(403).json({ error: 'Não autorizado' });
+    }
+
+    // Add to Redis for background processing if needed
+    try {
+      await patientQueue.add('patient-waiting', { id, name, complaint });
+    } catch (redisErr) {
+      console.warn('[Queue] Redis warning (continuing with DB):', redisErr);
+    }
+
+    // Upsert in Supabase
+    const { error } = await supabase
+      .from('queue')
+      .upsert({ 
+        patient_id: id, 
+        name, 
+        complaint, 
+        status: 'waiting', 
+        created_at: new Date().toISOString() 
+      }, { onConflict: 'patient_id' });
+
+    if (error) {
+      console.error('[Queue] Supabase Error:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    console.log(`[Queue] ${name} successfully added to queue`);
+    res.json({ success: true, message: 'Adicionado à fila' });
+  } catch (err: any) { 
+    console.error('[Queue] Internal Error:', err);
+    res.status(500).json({ error: err.message }); 
+  }
 });
+
 
 app.get('/api/queue', authenticateToken, authorizeDoctor, async (req, res) => {
   try {
