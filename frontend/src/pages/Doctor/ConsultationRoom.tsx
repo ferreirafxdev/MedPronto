@@ -1,13 +1,25 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import apiClient from '../../api/client';
-import { CheckCircle, Edit3, ClipboardList, PenTool, FileText, Download, ShieldCheck } from 'lucide-react';
+import { CheckCircle, Edit3, ClipboardList, PenTool, FileText, ShieldCheck, Mic, MicOff, Video as VideoIcon, VideoOff, PhoneOff } from 'lucide-react';
+import { OpenVidu, Session, Publisher, Subscriber } from 'openvidu-browser';
+import VideoComponent from '../../components/VideoComponent';
 
 const ConsultationRoom = () => {
   const { roomId } = useParams();
   const { user } = useStore();
   const navigate = useNavigate();
+  
+  // -- OpenVidu State --
+  const [OV, setOV] = useState<OpenVidu | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [publisher, setPublisher] = useState<Publisher | null>(null);
+  const [subscriber, setSubscriber] = useState<Subscriber | null>(null);
+  const [audioEnabled, setAudioEnabled] = useState(true);
+  const [videoEnabled, setVideoEnabled] = useState(true);
+
+  // -- Medical Record State --
   const [activeTab, setActiveTab] = useState<'evolucao' | 'exames' | 'receituario' | 'atestado'>('evolucao');
   const [notes, setNotes] = useState('');
   const [prescriptions, setPrescriptions] = useState('');
@@ -21,76 +33,93 @@ const ConsultationRoom = () => {
   const [atestadoModel, setAtestadoModel] = useState('padrão');
   const [prescriptionContent, setPrescriptionContent] = useState('');
 
-  useEffect(() => { const t = setInterval(() => setConsultationTime(p => p + 1), 1000); return () => clearInterval(t); }, []);
+  // -- Timer --
+  useEffect(() => { 
+    const t = setInterval(() => setConsultationTime(p => p + 1), 1000); 
+    return () => clearInterval(t); 
+  }, []);
+  
   const formatTime = (s: number) => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
 
-  useEffect(() => {
-    if(!user || user.role !== 'doctor') { navigate('/doctor/login'); return; }
-  }, [user, navigate]);
+  // -- OpenVidu Logic --
+  const joinSession = useCallback(async () => {
+    const ov = new OpenVidu();
+    const mySession = ov.initSession();
+
+    mySession.on('streamCreated', (event) => {
+      const sub = mySession.subscribe(event.stream, undefined);
+      setSubscriber(sub);
+    });
+
+    mySession.on('streamDestroyed', () => setSubscriber(null));
+
+    try {
+      // 1. Create Session in Backend
+      const sessionResponse = await apiClient.post('/api/webrtc/sessions', { customSessionId: roomId });
+      const sessionId = sessionResponse.data.sessionId;
+
+      // 2. Get Token from Backend
+      const tokenResponse = await apiClient.post(`/api/webrtc/sessions/${sessionId}/connections`, {
+        role: 'PUBLISHER',
+        data: JSON.stringify({ clientData: user?.name || 'Médico' }),
+      });
+      const token = tokenResponse.data.token;
+
+      // 3. Connect to Session
+      await mySession.connect(token, { clientData: user?.name || 'Médico' });
+
+      // 4. Publish Local Stream
+      const pub = await ov.initPublisherAsync(undefined, {
+        audioSource: undefined,
+        videoSource: undefined,
+        publishAudio: true,
+        publishVideo: true,
+        resolution: '1280x720',
+        frameRate: 30,
+        insertMode: 'APPEND',
+        mirror: true,
+      });
+
+      mySession.publish(pub);
+      setOV(ov);
+      setSession(mySession);
+      setPublisher(pub);
+    } catch (error) {
+      console.error('Error joining session:', error);
+      alert('Erro ao conectar ao vídeo.');
+    }
+  }, [roomId, user]);
 
   useEffect(() => {
-    if (activeTab === 'atestado' && !atestadoContent) {
-      updateAtestadoModel('padrão');
-    }
-    if (activeTab === 'receituario' && !prescriptionContent) {
-      setPrescriptionContent(`RECEITUÁRIO MÉDICO\n\nPaciente: ${user?.name}\nData: ${new Date().toLocaleDateString('pt-BR')}\n\nPrescrição:\n1. `);
-    }
-  }, [activeTab]);
+    if (!user || user.role !== 'doctor') { navigate('/doctor/login'); return; }
+    joinSession();
+    return () => {
+      if (session) session.disconnect();
+    };
+  }, [user, navigate, joinSession]);
 
-  const updateAtestadoModel = (model: string) => {
-    setAtestadoModel(model);
-    const date = new Date().toLocaleDateString('pt-BR');
-    if (model === 'padrão') {
-      setAtestadoContent(`ATESTADO MÉDICO\n\nAtesto para os devidos fins que o(a) Sr(a). ${user?.name}, foi atendido(a) em consulta médica nesta data, devendo permanecer em repouso por um período de ${daysOff} dia(s) a partir desta data.\n\nCID: ${cid || 'Não informado'}\n\nManaus, ${date}.`);
-    } else if (model === 'comparecimento') {
-      setAtestadoContent(`DECLARAÇÃO DE COMPARECIMENTO\n\nDeclaro para os devidos fins que o(a) Sr(a). ${user?.name}, compareceu a este serviço de saúde para atendimento médico no dia ${date}.`);
+  const toggleAudio = () => {
+    if (publisher) {
+      publisher.publishAudio(!audioEnabled);
+      setAudioEnabled(!audioEnabled);
     }
   };
 
+  const toggleVideo = () => {
+    if (publisher) {
+      publisher.publishVideo(!videoEnabled);
+      setVideoEnabled(!videoEnabled);
+    }
+  };
+
+  // -- Business Logic --
   const downloadPDF = async (endpoint: string, data: any, filename: string) => {
     setLoading(true);
     try {
       const resp = await apiClient.post(`/api/${endpoint}`, { patientId: roomId, doctorId: user?.id, ...data }, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([resp.data]));
       const link = document.createElement('a'); link.href = url; link.setAttribute('download', filename); document.body.appendChild(link); link.click(); link.remove();
-      alert(`✅ ${endpoint} gerado com sucesso!`);
     } catch (err) { alert(`Erro ao gerar ${endpoint}.`); } finally { setLoading(false); }
-  };
-
-  const startDigitalSignature = async () => {
-    if (!user?.id) return;
-    setLoading(true);
-    try {
-      const resp = await apiClient.post('/api/doctor/signature/start', { doctorId: user.id });
-      const sessionId = resp.data.session_id;
-      setSigningStatus('notified');
-      const interval = setInterval(async () => {
-        try {
-          const statusResp = await apiClient.get(`/api/doctor/signature/status/${sessionId}`);
-          if (statusResp.data.status === 'ready') {
-            setSigningStatus('signed');
-            clearInterval(interval);
-            alert("✅ Assinado com sucesso!");
-          } else if (statusResp.data.status === 'denied') {
-            setSigningStatus('error');
-            clearInterval(interval);
-            alert("❌ Assinatura negada.");
-          }
-        } catch (e) { clearInterval(interval); }
-      }, 3000);
-    } catch (err: any) {
-      alert("Erro ao iniciar assinatura.");
-      setSigningStatus('idle');
-    } finally { setLoading(false); }
-  };
-
-  const emitAtestado = async () => {
-    setLoading(true);
-    try {
-      await apiClient.post('/api/atestado', { patientId: roomId, doctorId: user?.id, daysOff, cid, content: atestadoContent });
-      alert("✅ Atestado liberado!");
-      setActiveTab('evolucao');
-    } catch (err) { alert("Erro ao emitir."); } finally { setLoading(false); }
   };
 
   const endConsultation = async () => {
@@ -98,138 +127,124 @@ const ConsultationRoom = () => {
       setLoading(true);
       try {
         await apiClient.post('/api/end-consultation', { 
-          patientId: roomId, 
-          doctorId: user?.id, 
-          notes, 
-          prescriptions: prescriptions || prescriptionContent, 
-          exams,
-          content: prescriptionContent
+          patientId: roomId, doctorId: user?.id, notes, prescriptions: prescriptions || prescriptionContent, exams, content: prescriptionContent
         });
-        alert("✅ Finalizado!"); 
+        if (session) session.disconnect();
         navigate('/doctor/dashboard');
       } catch(err) { alert("Erro ao encerrar."); } finally { setLoading(false); }
     }
   };
 
-  const roomName = `MedProntoRoom_Doc_${user?.id?.replace(/[^a-zA-Z0-9]/g, '')}`;
-
-  const SectionHeader = ({ icon: Icon, title, desc }: { icon: any; title: string; desc: string }) => (
+  const SectionHeader = ({ icon: Icon, title, desc }: any) => (
     <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-      <div style={{ background: 'var(--accent-ultra-light)', color: 'var(--accent)', padding: '0.45rem', borderRadius: 'var(--radius-md)', display: 'flex' }}>
+      <div style={{ background: '#eff6ff', color: '#2563eb', padding: '0.45rem', borderRadius: '0.75rem', display: 'flex' }}>
         <Icon size={18} />
       </div>
       <div>
-        <h4 style={{ margin: 0, color: 'var(--text-heading)', fontSize: '0.95rem', fontWeight: 700 }}>{title}</h4>
-        <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>{desc}</p>
+        <h4 style={{ margin: 0, color: '#0f172a', fontSize: '0.95rem', fontWeight: 700 }}>{title}</h4>
+        <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b' }}>{desc}</p>
       </div>
     </div>
   );
 
   return (
-    <div className="room-full-page animate-fade-in" style={{ display: 'flex', flexDirection: 'column', background: '#0f172a' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1.5rem', background: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#0f172a', overflow: 'hidden' }}>
+      {/* Top Bar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1.5rem', background: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(10px)', borderBottom: '1px solid rgba(255,255,255,0.05)', zIndex: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div className="status-badge" style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)' }}>AO VIVO</div>
-            <div>
-               <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>PACIENTE</span>
-               <h2 style={{ margin: 0, fontSize: '1rem', color: 'white', fontWeight: 700 }}>{user?.name}</h2>
-            </div>
+            <div style={{ background: '#10b981', color: 'white', padding: '0.2rem 0.6rem', borderRadius: '2rem', fontSize: '0.65rem', fontWeight: 800 }}>AO VIVO</div>
+            <h2 style={{ margin: 0, fontSize: '1rem', color: 'white', fontWeight: 700 }}>Sala de Atendimento</h2>
           </div>
           <div style={{ height: '24px', width: '1px', background: 'rgba(255,255,255,0.1)' }} />
-          <div>
-            <span style={{ display: 'block', fontSize: '0.65rem', fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>EM ATENDIMENTO</span>
-            <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#f43f5e', fontFamily: 'monospace' }}>{formatTime(consultationTime)}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#f43f5e', fontFamily: 'monospace', fontWeight: 800 }}>
+             {formatTime(consultationTime)}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.8rem', borderRadius: '2rem', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)' }}>
-            <ShieldCheck size={14} />
-            <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Criptografia Ativa</span>
-          </div>
-          <button className="btn btn-outline btn-sm" style={{ color: 'white', borderColor: 'rgba(255,255,255,0.2)' }} onClick={() => navigate('/doctor/dashboard')}>Ver Painel</button>
+        <div style={{ display: 'flex', gap: '0.75rem' }}>
+           <button className="btn btn-outline btn-sm" style={{ color: 'white', borderColor: 'rgba(255,255,255,0.2)' }} onClick={() => navigate('/doctor/dashboard')}>Voltar</button>
         </div>
       </div>
 
-      <div style={{ flexGrow: 1, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 420px', overflow: 'hidden' }}>
-        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column' }}>
-           <div style={{ flexGrow: 1, position: 'relative', background: '#000' }}>
-              <iframe
-                src={`https://p2p.mirotalk.com/join/${roomName}?name=${encodeURIComponent(user?.name || 'Médico')}&audio=1&video=1&chat=0&settings=0&notify=0`}
-                style={{ width: '100%', height: '100%', border: 'none' }}
-                allow="camera; microphone; display-capture; fullscreen; clipboard-read; clipboard-write; speaker-selection"
-              />
-           </div>
+      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 420px', position: 'relative' }}>
+        {/* Video Area */}
+        <div style={{ position: 'relative', background: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {subscriber ? (
+            <VideoComponent streamManager={subscriber} isMain={true} />
+          ) : (
+            <div style={{ textAlign: 'center', color: '#475569' }}>
+               <Loader2 className="animate-spin" size={48} style={{ marginBottom: '1rem', margin: '0 auto' }} />
+               <p>Aguardando o paciente entrar...</p>
+            </div>
+          )}
+
+          {/* Local PiP */}
+          {publisher && (
+            <div style={{ position: 'absolute', top: '20px', right: '20px', width: '180px', height: '120px', zIndex: 5, borderRadius: '1rem', overflow: 'hidden', border: '2px solid rgba(255,255,255,0.2)', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)' }}>
+               <VideoComponent streamManager={publisher} />
+            </div>
+          )}
+
+          {/* Floating Controls */}
+          <div style={{ position: 'absolute', bottom: '30px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '1rem', background: 'rgba(15, 23, 42, 0.8)', padding: '0.75rem 1.5rem', borderRadius: '4rem', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)', zIndex: 10 }}>
+             <ControlBtn icon={audioEnabled ? <Mic size={20}/> : <MicOff size={20}/>} active={audioEnabled} onClick={toggleAudio} />
+             <ControlBtn icon={videoEnabled ? <VideoIcon size={20}/> : <VideoOff size={20}/>} active={videoEnabled} onClick={toggleVideo} />
+             <ControlBtn icon={<PhoneOff size={20}/>} danger onClick={endConsultation} />
+          </div>
         </div>
 
-        <div style={{ background: '#fff', borderLeft: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ display: 'flex', padding: '0.5rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', gap: '0.2rem' }}>
-            <TabBtn active={activeTab === 'evolucao'} onClick={()=>setActiveTab('evolucao')} icon={Edit3} label="Evolução" />
-            <TabBtn active={activeTab === 'receituario'} onClick={()=>setActiveTab('receituario')} icon={PenTool} label="Receita" />
-            <TabBtn active={activeTab === 'exames'} onClick={()=>setActiveTab('exames')} icon={ClipboardList} label="Exames" />
-            <TabBtn active={activeTab === 'atestado'} onClick={()=>setActiveTab('atestado')} icon={FileText} label="Atestado" />
-          </div>
+        {/* Sidebar (Notes) */}
+        <div style={{ background: 'white', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e2e8f0' }}>
+           <div style={{ display: 'flex', padding: '0.5rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', gap: '0.25rem' }}>
+              <TabBtn active={activeTab === 'evolucao'} onClick={()=>setActiveTab('evolucao')} icon={Edit3} label="Evolução" />
+              <TabBtn active={activeTab === 'receituario'} onClick={()=>setActiveTab('receituario')} icon={PenTool} label="Receita" />
+              <TabBtn active={activeTab === 'atestado'} onClick={()=>setActiveTab('atestado')} icon={FileText} label="Atestado" />
+           </div>
 
-          <div style={{ flexGrow: 1, padding: '1.25rem', overflowY: 'auto' }}>
-            {activeTab === 'evolucao' && (
-              <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <SectionHeader icon={Edit3} title="Evolução Clínica" desc="Quadro clínico e anamnese." />
-                <textarea className="form-control" style={{ flexGrow: 1, resize: 'none', border: '1px solid #f1f5f9', background: '#f8fafc', padding: '1rem', borderRadius: '1rem' }} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Paciente apresenta..." />
-              </div>
-            )}
-            {activeTab === 'receituario' && (
-              <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <SectionHeader icon={PenTool} title="Receituário" desc="Prescrição digital." />
-                <textarea className="form-control" style={{ flexGrow: 1, resize: 'none', border: '1px solid #f1f5f9', background: '#f8fafc', padding: '1rem', borderRadius: '1rem', fontFamily: 'monospace', fontSize: '0.85rem' }} value={prescriptionContent} onChange={e=>setPrescriptionContent(e.target.value)} placeholder="Digite a prescrição..." />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginTop: '1rem' }}>
-                  <button className="btn btn-outline btn-sm" onClick={() => downloadPDF('receita', { prescriptions: prescriptionContent }, 'receita.pdf')} disabled={loading}>Download PDF</button>
-                  <button className="btn btn-primary btn-sm" onClick={startDigitalSignature} disabled={loading || signingStatus === 'signed'}>
-                    {signingStatus === 'signed' ? 'Assinado ✅' : 'Assinar Bird ID'}
-                  </button>
+           <div style={{ flex: 1, padding: '1.5rem', overflowY: 'auto' }}>
+              {activeTab === 'evolucao' && (
+                <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                  <SectionHeader icon={Edit3} title="Evolução do Caso" desc="Anote aqui o quadro clínico." />
+                  <textarea className="form-control" style={{ flex: 1, resize: 'none', background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: '1rem', padding: '1rem' }} value={notes} onChange={e=>setNotes(e.target.value)} />
                 </div>
-              </div>
-            )}
-            {activeTab === 'exames' && (
-              <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <SectionHeader icon={ClipboardList} title="Pedidos de Exame" desc="Solicitações laboratoriais." />
-                <textarea className="form-control" style={{ flexGrow: 1, resize: 'none', border: '1px solid #f1f5f9', background: '#f8fafc', padding: '1rem', borderRadius: '1rem' }} value={exams} onChange={e=>setExams(e.target.value)} placeholder="Exames..." />
-                <button className="btn btn-primary btn-sm" onClick={() => downloadPDF('exames', { exams }, 'pedido_exame.pdf')} disabled={loading} style={{ marginTop: '1rem' }}>Gerar Pedido</button>
-              </div>
-            )}
-            {activeTab === 'atestado' && (
-              <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                <SectionHeader icon={FileText} title="Atestado Médico" desc="Afastamento e justificativa." />
-                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                  <select className="form-control" style={{ fontSize: '0.75rem', height: '36px', padding: '0 0.5rem' }} value={atestadoModel} onChange={(e) => updateAtestadoModel(e.target.value)}>
-                    <option value="padrão">Atestado Padrão</option>
-                    <option value="comparecimento">Declaração de Comparecimento</option>
-                  </select>
+              )}
+              {activeTab === 'receituario' && (
+                <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                  <SectionHeader icon={PenTool} title="Prescrição" desc="Será salva no prontuário." />
+                  <textarea className="form-control" style={{ flex: 1, resize: 'none', background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: '1rem', padding: '1rem', fontFamily: 'monospace' }} value={prescriptionContent} onChange={e=>setPrescriptionContent(e.target.value)} />
                 </div>
-                <div style={{ background: '#f8fafc', padding: '0.75rem', borderRadius: '1rem', border: '1px solid #f1f5f9', marginBottom: '0.75rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                   <div className="form-group" style={{ margin: 0 }}><label style={{ fontSize: '0.65rem', fontWeight: 700 }}>DIAS</label><input type="number" className="form-control" style={{ height: '32px' }} value={daysOff} onChange={e=>setDaysOff(e.target.value)} /></div>
-                   <div className="form-group" style={{ margin: 0 }}><label style={{ fontSize: '0.65rem', fontWeight: 700 }}>CID</label><input type="text" className="form-control" style={{ height: '32px' }} value={cid} onChange={e=>setCid(e.target.value)} placeholder="Ex: J06" /></div>
+              )}
+              {activeTab === 'atestado' && (
+                <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                  <SectionHeader icon={FileText} title="Atestado Médico" desc="Emissão de afastamento." />
+                  <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '1rem', marginBottom: '1rem', border: '1px solid #f1f5f9', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                     <div><label style={{ fontSize: '0.65rem', fontWeight: 800 }}>DIAS</label><input type="number" className="form-control" value={daysOff} onChange={e=>setDaysOff(e.target.value)} /></div>
+                     <div><label style={{ fontSize: '0.65rem', fontWeight: 800 }}>CID</label><input type="text" className="form-control" value={cid} onChange={e=>setCid(e.target.value)} /></div>
+                  </div>
+                  <textarea className="form-control" style={{ flex: 1, resize: 'none', background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: '1rem', padding: '1rem' }} value={atestadoContent} onChange={e=>setAtestadoContent(e.target.value)} />
                 </div>
-                <textarea className="form-control" style={{ flexGrow: 1, resize: 'none', border: '1px solid #f1f5f9', background: '#f8fafc', padding: '1rem', borderRadius: '1rem', fontFamily: 'monospace', fontSize: '0.85rem' }} value={atestadoContent} onChange={e=>setAtestadoContent(e.target.value)} />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginTop: '1rem' }}>
-                  <button className="btn btn-outline btn-sm" onClick={() => downloadPDF('atestado', { daysOff, cid }, 'atestado.pdf')} disabled={loading}>Download PDF</button>
-                  <button className="btn btn-primary btn-sm" onClick={emitAtestado} disabled={loading}>Liberar no Perfil</button>
-                </div>
-              </div>
-            )}
-          </div>
-          <div style={{ padding: '1.25rem', borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
-            <button className="btn btn-primary btn-full btn-lg" onClick={endConsultation} disabled={loading} style={{ background: '#0f172a', borderRadius: '3rem' }}>
-              {loading ? "Processando..." : "FINALIZAR ATENDIMENTO"}
-            </button>
-          </div>
+              )}
+           </div>
+
+           <div style={{ padding: '1.5rem', background: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
+              <button className="btn btn-primary btn-full btn-lg" onClick={endConsultation} style={{ borderRadius: '3rem', height: '56px', fontWeight: 800 }}>
+                 FINALIZAR CONSULTA
+              </button>
+           </div>
         </div>
       </div>
     </div>
   );
 };
 
-const TabBtn = ({ active, onClick, icon: Icon, label }: { active: boolean; onClick: any; icon: any; label: string }) => (
-  <button onClick={onClick} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', padding: '0.45rem 0.2rem', borderRadius: '0.75rem', border: 'none', background: active ? 'white' : 'transparent', color: active ? 'var(--accent)' : '#64748b', fontSize: '0.75rem', fontWeight: active ? 700 : 500, boxShadow: active ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.2s' }}>
+const ControlBtn = ({ icon, onClick, active, danger }: any) => (
+  <button onClick={onClick} style={{ width: '48px', height: '48px', borderRadius: '50%', border: 'none', background: danger ? '#ef4444' : active ? '#6366f1' : '#475569', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: 'all 0.2s', boxShadow: '0 4px 6px rgba(0,0,0,0.2)' }}>
+    {icon}
+  </button>
+);
+
+const TabBtn = ({ active, onClick, icon: Icon, label }: any) => (
+  <button onClick={onClick} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.75rem', borderRadius: '0.75rem', border: 'none', background: active ? 'white' : 'transparent', color: active ? '#6366f1' : '#64748b', fontSize: '0.75rem', fontWeight: active ? 700 : 500, transition: 'all 0.2s', boxShadow: active ? '0 4px 6px -1px rgba(0,0,0,0.05)' : 'none' }}>
     <Icon size={14} /> {label}
   </button>
 );

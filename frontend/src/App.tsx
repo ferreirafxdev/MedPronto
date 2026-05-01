@@ -17,11 +17,14 @@ import './index.css';
 function AppContent() {
   const location = useLocation();
   const isRoom = location.pathname.includes('/consultation/');
+  const isPayment = location.pathname === '/patient/payment';
+  const shouldHideHeader = isRoom || isPayment;
 
   return (
-    <div className={`app-container ${isRoom ? 'no-header' : ''}`}>
-      {!isRoom && <Header />}
+    <div className={`app-container ${shouldHideHeader ? 'no-header' : ''}`}>
+      {!shouldHideHeader && <Header />}
       <main className="main-content">
+
         <Routes>
             <Route path="/" element={<HomePage />} />
             

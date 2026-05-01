@@ -11,6 +11,7 @@ import dns from 'dns';
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { supabase } from './utils/supabase';
 import { s3Client, uploadPDF } from './utils/s3';
+import { OpenVidu, SessionProperties } from 'openvidu-node-client';
 
 import { patientQueue, documentQueue } from './queue';
 import { createBullBoard } from '@bull-board/api';
@@ -71,6 +72,38 @@ app.use('/admin/queues', authenticateToken, authorizeAdmin, serverAdapter.getRou
 
 // -- In-memory Log Buffer for Dashboard --
 const logBuffer: string[] = [];
+
+// -- OpenVidu Config --
+const OPENVIDU_URL = process.env.OPENVIDU_URL || 'https://localhost:4443';
+const OPENVIDU_SECRET = process.env.OPENVIDU_SECRET || 'MY_SECRET';
+const openvidu = new OpenVidu(OPENVIDU_URL, OPENVIDU_SECRET);
+
+// -- OpenVidu Routes --
+app.post('/api/webrtc/sessions', authenticateToken, async (req, res) => {
+  try {
+    const properties: SessionProperties = { customSessionId: req.body.customSessionId };
+    const session = await openvidu.createSession(properties);
+    res.json({ sessionId: session.sessionId });
+  } catch (err: any) {
+    // If session already exists, just return the ID
+    if (err.message?.includes('409')) {
+      return res.json({ sessionId: req.body.customSessionId });
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/webrtc/sessions/:sessionId/connections', authenticateToken, async (req, res) => {
+  try {
+    const session = openvidu.activeSessions.find(s => s.sessionId === req.params.sessionId);
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+    
+    const connection = await session.createConnection(req.body);
+    res.json({ token: connection.token });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 const addLog = (msg: string) => {
   logBuffer.unshift(`[${new Date().toLocaleTimeString()}] ${msg}`);
