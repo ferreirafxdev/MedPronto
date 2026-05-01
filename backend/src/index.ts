@@ -3,14 +3,15 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
-import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { config } from './config';
 import dns from 'dns';
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { supabase } from './utils/supabase';
+import { s3Client, uploadPDF } from './utils/s3';
+
 import { patientQueue, documentQueue } from './queue';
 import { createBullBoard } from '@bull-board/api';
 import { BullMQAdapter } from '@bull-board/api/bullMQAdapter';
@@ -125,8 +126,6 @@ app.use(generalLimiter);
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20 });
 const validateLimiter = rateLimit({ windowMs: 60 * 60 * 1000, max: 100 });
 
-const supabase = createClient(supabaseUrl, supabaseKey);
-
 app.get('/api/health', async (req, res) => {
   try {
     const { error } = await supabase.from('patients').select('id').limit(1);
@@ -137,6 +136,7 @@ app.get('/api/health', async (req, res) => {
     res.json({ status: 'error', error: err.message }); 
   }
 });
+
 
 
 // -- Routes --
