@@ -263,7 +263,15 @@ app.get('/api/validate-document/:code', validateLimiter, async (req, res) => {
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
+app.post('/api/payment/pix-simulate', async (req, res) => {
+  try {
+    const pixKey = '00020126580014BR.GOV.BCB.PIX01366366f1-med-pronto-pix-key-2026520400005303986540550.005802BR5925MEDPRONTO TELEMEDICINA6009SAO PAULO62070503***6304E2B1';
+    res.json({ success: true, pixKey });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
 app.use((req, res) => { res.status(404).json({ error: 'Não encontrado' }); });
+
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => { console.log(`Server running on port ${PORT}`); });

@@ -23,7 +23,8 @@ function AppContent() {
   return (
     <div className={`app-container ${shouldHideHeader ? 'no-header' : ''}`}>
       {!shouldHideHeader && <Header />}
-      <main className="main-content">
+      <main className={`main-content ${shouldHideHeader ? 'no-padding' : ''}`}>
+
 
         <Routes>
             <Route path="/" element={<HomePage />} />

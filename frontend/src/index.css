@@ -703,6 +703,15 @@ h1, h2, h3, h4, h5, h6 {
 @media (max-width: 640px) {
     .bento-grid { grid-template-columns: 1fr; }
     .bento-featured { grid-column: span 1; }
+}.main-content {
+  padding-top: 72px; /* Default header height */
+  min-height: 100vh;
 }
 
+.main-content.no-padding {
+  padding-top: 0 !important;
+}
 
+.no-header header {
+  display: none !important;
+}
