@@ -4,32 +4,34 @@ import IORedis from 'ioredis';
 
 const connection = new IORedis(config.redis.url, {
   maxRetriesPerRequest: null,
+  enableReadyCheck: false,
 });
 
-// Queues
+
+// 1. Patient Queue (Management of the consultation flow)
 export const patientQueue = new Queue('patient-queue', { connection });
+
+// 2. Document Queue (PDF generation, Signatures, Emails)
 export const documentQueue = new Queue('document-queue', { connection });
 
-// Worker for background tasks (PDF generation, etc)
+// -------------------------------------------------------------------------
+// Background Worker for heavy tasks
+// -------------------------------------------------------------------------
 export const documentWorker = new Worker('document-queue', async (job: Job) => {
-  console.log(`🚀 Processing job ${job.id} of type ${job.name}`);
-  
   const { type, data } = job.data;
+  console.log(`[Worker] Processing ${type} for patient ${data.patientId}`);
 
-  if (type === 'GENERATE_PDF') {
-    // In a real scenario, we'd call the PDF generation logic here
-    // For now, we simulate it
-    console.log(`📄 Generating PDF for ${data.patientId}...`);
-    // Logic for PDFTemplate and uploadPDF could be moved here
+  switch (type) {
+    case 'GENERATE_CONSULTATION':
+      // Here we would call the PDF logic
+      break;
+    case 'GENERATE_ATESTADO':
+      // Here we would call the Atestado logic
+      break;
+    default:
+      console.warn(`[Worker] Unknown job type: ${type}`);
   }
-
-  return { success: true };
 }, { connection });
 
-documentWorker.on('completed', (job) => {
-  console.log(`✅ Job ${job.id} completed!`);
-});
-
-documentWorker.on('failed', (job, err) => {
-  console.error(`❌ Job ${job?.id} failed:`, err);
-});
+documentWorker.on('completed', (job) => console.log(`✅ Job ${job.id} done.`));
+documentWorker.on('failed', (job, err) => console.error(`❌ Job ${job?.id} failed:`, err));

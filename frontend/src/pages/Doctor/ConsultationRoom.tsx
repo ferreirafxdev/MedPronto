@@ -1,11 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
-import { io } from 'socket.io-client';
 import apiClient from '../../api/client';
-import { openDocument } from '../../utils/s3';
-import { CheckCircle, Edit3, ClipboardList, PenTool, FileText, Download, Send, ShieldCheck } from 'lucide-react';
-// Mirotalk WebRTC Integration - Replacing Jitsi
+import { CheckCircle, Edit3, ClipboardList, PenTool, FileText, Download, ShieldCheck } from 'lucide-react';
 
 const ConsultationRoom = () => {
   const { roomId } = useParams();
@@ -19,27 +16,17 @@ const ConsultationRoom = () => {
   const [cid, setCid] = useState('');
   const [loading, setLoading] = useState(false);
   const [signingStatus, setSigningStatus] = useState<'idle' | 'notified' | 'signed' | 'error'>('idle');
-  const [messages, setMessages] = useState<{sender: string, text: string, time: string}[]>([]);
-  const [newMessage, setNewMessage] = useState('');
-  const [socket, setSocket] = useState<any>(null);
   const [consultationTime, setConsultationTime] = useState(0);
   const [atestadoContent, setAtestadoContent] = useState('');
   const [atestadoModel, setAtestadoModel] = useState('padrão');
   const [prescriptionContent, setPrescriptionContent] = useState('');
-
 
   useEffect(() => { const t = setInterval(() => setConsultationTime(p => p + 1), 1000); return () => clearInterval(t); }, []);
   const formatTime = (s: number) => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
 
   useEffect(() => {
     if(!user || user.role !== 'doctor') { navigate('/doctor/login'); return; }
-    const s = io(import.meta.env.VITE_API_URL || 'http://localhost:3001');
-    setSocket(s);
-    s.emit('join_room', roomId);
-    s.emit('consultation_started', { roomId, doctorId: user.id, doctorName: user.name });
-    s.on('receive_message', (data: any) => { setMessages(prev => [...prev, { sender: data.sender, text: data.text, time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) }]); });
-    return () => { s.disconnect(); };
-  }, [roomId, user, navigate]);
+  }, [user, navigate]);
 
   useEffect(() => {
     if (activeTab === 'atestado' && !atestadoContent) {
@@ -60,15 +47,6 @@ const ConsultationRoom = () => {
     }
   };
 
-
-  const sendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if(!newMessage.trim() || !socket) return;
-    socket.emit('send_message', { roomId, sender: user?.name || 'Médico', text: newMessage });
-    setMessages(prev => [...prev, { sender: 'Você', text: newMessage, time: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) }]);
-    setNewMessage('');
-  };
-
   const downloadPDF = async (endpoint: string, data: any, filename: string) => {
     setLoading(true);
     try {
@@ -86,49 +64,37 @@ const ConsultationRoom = () => {
       const resp = await apiClient.post('/api/doctor/signature/start', { doctorId: user.id });
       const sessionId = resp.data.session_id;
       setSigningStatus('notified');
-      
-      // Poll for status
       const interval = setInterval(async () => {
         try {
           const statusResp = await apiClient.get(`/api/doctor/signature/status/${sessionId}`);
           if (statusResp.data.status === 'ready') {
             setSigningStatus('signed');
             clearInterval(interval);
-            alert("✅ Receita assinada digitalmente com sucesso!");
+            alert("✅ Assinado com sucesso!");
           } else if (statusResp.data.status === 'denied') {
             setSigningStatus('error');
             clearInterval(interval);
-            alert("❌ Assinatura negada no aplicativo.");
+            alert("❌ Assinatura negada.");
           }
-        } catch (e) {
-          clearInterval(interval);
-        }
+        } catch (e) { clearInterval(interval); }
       }, 3000);
     } catch (err: any) {
-      alert("Erro ao iniciar assinatura: " + (err.response?.data?.error || err.message));
+      alert("Erro ao iniciar assinatura.");
       setSigningStatus('idle');
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const emitAtestado = async () => {
     setLoading(true);
     try {
-      await apiClient.post('/api/atestado', { 
-        patientId: roomId, 
-        doctorId: user?.id, 
-        daysOff, 
-        cid, 
-        content: atestadoContent 
-      });
-      alert("✅ Atestado liberado e salvo no histórico do paciente!");
+      await apiClient.post('/api/atestado', { patientId: roomId, doctorId: user?.id, daysOff, cid, content: atestadoContent });
+      alert("✅ Atestado liberado!");
       setActiveTab('evolucao');
-    } catch (err) { alert("Erro ao emitir atestado."); } finally { setLoading(false); }
+    } catch (err) { alert("Erro ao emitir."); } finally { setLoading(false); }
   };
 
   const endConsultation = async () => {
-    if(window.confirm("Deseja encerrar o atendimento? Os documentos serão salvos no histórico do paciente.")) {
+    if(window.confirm("Deseja encerrar o atendimento?")) {
       setLoading(true);
       try {
         await apiClient.post('/api/end-consultation', { 
@@ -137,14 +103,13 @@ const ConsultationRoom = () => {
           notes, 
           prescriptions: prescriptions || prescriptionContent, 
           exams,
-          content: prescriptionContent // Saving the digital prescription content
+          content: prescriptionContent
         });
-        alert("✅ Atendimento finalizado com sucesso!"); 
+        alert("✅ Finalizado!"); 
         navigate('/doctor/dashboard');
       } catch(err) { alert("Erro ao encerrar."); } finally { setLoading(false); }
     }
   };
-
 
   const roomName = `MedProntoRoom_Doc_${user?.id?.replace(/[^a-zA-Z0-9]/g, '')}`;
 
@@ -162,13 +127,10 @@ const ConsultationRoom = () => {
 
   return (
     <div className="room-full-page animate-fade-in" style={{ display: 'flex', flexDirection: 'column', background: '#0f172a' }}>
-      {/* Dynamic Minimalist Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1.5rem', background: 'rgba(15, 23, 42, 0.8)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div className="status-badge" style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
-              AO VIVO
-            </div>
+            <div className="status-badge" style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)' }}>AO VIVO</div>
             <div>
                <span style={{ fontSize: '0.65rem', fontWeight: 700, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>PACIENTE</span>
                <h2 style={{ margin: 0, fontSize: '1rem', color: 'white', fontWeight: 700 }}>{user?.name}</h2>
@@ -180,7 +142,6 @@ const ConsultationRoom = () => {
             <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#f43f5e', fontFamily: 'monospace' }}>{formatTime(consultationTime)}</span>
           </div>
         </div>
-
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.8rem', borderRadius: '2rem', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)' }}>
             <ShieldCheck size={14} />
@@ -191,7 +152,6 @@ const ConsultationRoom = () => {
       </div>
 
       <div style={{ flexGrow: 1, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 420px', overflow: 'hidden' }}>
-        {/* Main Video Area */}
         <div style={{ position: 'relative', display: 'flex', flexDirection: 'column' }}>
            <div style={{ flexGrow: 1, position: 'relative', background: '#000' }}>
               <iframe
@@ -200,26 +160,8 @@ const ConsultationRoom = () => {
                 allow="camera; microphone; display-capture; fullscreen; clipboard-read; clipboard-write; speaker-selection"
               />
            </div>
-           
-           {/* Chat Overlay (Optional) or bottom bar */}
-           <div style={{ position: 'absolute', bottom: '20px', left: '20px', width: '320px', maxHeight: '200px', background: 'rgba(15, 23, 42, 0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '1rem', display: 'flex', flexDirection: 'column', overflow: 'hidden', backdropFilter: 'blur(8px)' }}>
-              <div style={{ padding: '0.4rem 0.75rem', background: 'rgba(255,255,255,0.05)', fontSize: '0.65rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.05em' }}>MENSAGENS</div>
-              <div style={{ flexGrow: 1, padding: '0.75rem', overflowY: 'auto' }}>
-                 {messages.length === 0 ? <p style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)' }}>Sem mensagens...</p> : messages.map((m, i) => (
-                    <div key={i} style={{ marginBottom: '0.4rem' }}>
-                       <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent)' }}>{m.sender}: </span>
-                       <span style={{ fontSize: '0.75rem', color: 'white' }}>{m.text}</span>
-                    </div>
-                 ))}
-              </div>
-              <form onSubmit={sendMessage} style={{ display: 'flex', padding: '0.5rem', gap: '0.4rem', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                 <input type="text" className="form-control" style={{ height: '28px', background: 'rgba(255,255,255,0.05)', border: 'none', color: 'white', fontSize: '0.75rem' }} value={newMessage} onChange={e=>setNewMessage(e.target.value)} placeholder="Enviar mensagem..." />
-                 <button type="submit" className="btn btn-primary" style={{ width: '28px', height: '28px', padding: 0 }}><Send size={12} /></button>
-              </form>
-           </div>
         </div>
 
-        {/* Sidebar Medical Tools (Prontuário) */}
         <div style={{ background: '#fff', borderLeft: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', padding: '0.5rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', gap: '0.2rem' }}>
             <TabBtn active={activeTab === 'evolucao'} onClick={()=>setActiveTab('evolucao')} icon={Edit3} label="Evolução" />
@@ -247,7 +189,6 @@ const ConsultationRoom = () => {
                 </div>
               </div>
             )}
-
             {activeTab === 'exames' && (
               <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                 <SectionHeader icon={ClipboardList} title="Pedidos de Exame" desc="Solicitações laboratoriais." />
@@ -258,40 +199,24 @@ const ConsultationRoom = () => {
             {activeTab === 'atestado' && (
               <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                 <SectionHeader icon={FileText} title="Atestado Médico" desc="Afastamento e justificativa." />
-                
                 <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                  <select 
-                    className="form-control" 
-                    style={{ fontSize: '0.75rem', height: '36px', padding: '0 0.5rem' }}
-                    value={atestadoModel}
-                    onChange={(e) => updateAtestadoModel(e.target.value)}
-                  >
+                  <select className="form-control" style={{ fontSize: '0.75rem', height: '36px', padding: '0 0.5rem' }} value={atestadoModel} onChange={(e) => updateAtestadoModel(e.target.value)}>
                     <option value="padrão">Atestado Padrão</option>
                     <option value="comparecimento">Declaração de Comparecimento</option>
                   </select>
                 </div>
-
                 <div style={{ background: '#f8fafc', padding: '0.75rem', borderRadius: '1rem', border: '1px solid #f1f5f9', marginBottom: '0.75rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                    <div className="form-group" style={{ margin: 0 }}><label style={{ fontSize: '0.65rem', fontWeight: 700 }}>DIAS</label><input type="number" className="form-control" style={{ height: '32px' }} value={daysOff} onChange={e=>setDaysOff(e.target.value)} /></div>
                    <div className="form-group" style={{ margin: 0 }}><label style={{ fontSize: '0.65rem', fontWeight: 700 }}>CID</label><input type="text" className="form-control" style={{ height: '32px' }} value={cid} onChange={e=>setCid(e.target.value)} placeholder="Ex: J06" /></div>
                 </div>
-
-                <textarea 
-                  className="form-control" 
-                  style={{ flexGrow: 1, resize: 'none', border: '1px solid #f1f5f9', background: '#f8fafc', padding: '1rem', borderRadius: '1rem', fontFamily: 'monospace', fontSize: '0.85rem' }} 
-                  value={atestadoContent} 
-                  onChange={e=>setAtestadoContent(e.target.value)} 
-                />
-
+                <textarea className="form-control" style={{ flexGrow: 1, resize: 'none', border: '1px solid #f1f5f9', background: '#f8fafc', padding: '1rem', borderRadius: '1rem', fontFamily: 'monospace', fontSize: '0.85rem' }} value={atestadoContent} onChange={e=>setAtestadoContent(e.target.value)} />
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginTop: '1rem' }}>
                   <button className="btn btn-outline btn-sm" onClick={() => downloadPDF('atestado', { daysOff, cid }, 'atestado.pdf')} disabled={loading}>Download PDF</button>
                   <button className="btn btn-primary btn-sm" onClick={emitAtestado} disabled={loading}>Liberar no Perfil</button>
                 </div>
               </div>
             )}
-
           </div>
-
           <div style={{ padding: '1.25rem', borderTop: '1px solid #e2e8f0', background: '#f8fafc' }}>
             <button className="btn btn-primary btn-full btn-lg" onClick={endConsultation} disabled={loading} style={{ background: '#0f172a', borderRadius: '3rem' }}>
               {loading ? "Processando..." : "FINALIZAR ATENDIMENTO"}
@@ -304,22 +229,7 @@ const ConsultationRoom = () => {
 };
 
 const TabBtn = ({ active, onClick, icon: Icon, label }: { active: boolean; onClick: any; icon: any; label: string }) => (
-  <button onClick={onClick} style={{ 
-    flex: 1, 
-    display: 'flex', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    gap: '0.4rem', 
-    padding: '0.45rem 0.2rem', 
-    borderRadius: '0.75rem', 
-    border: 'none', 
-    background: active ? 'white' : 'transparent', 
-    color: active ? 'var(--accent)' : '#64748b', 
-    fontSize: '0.75rem', 
-    fontWeight: active ? 700 : 500,
-    boxShadow: active ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-    transition: 'all 0.2s'
-  }}>
+  <button onClick={onClick} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', padding: '0.45rem 0.2rem', borderRadius: '0.75rem', border: 'none', background: active ? 'white' : 'transparent', color: active ? 'var(--accent)' : '#64748b', fontSize: '0.75rem', fontWeight: active ? 700 : 500, boxShadow: active ? '0 1px 3px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.2s' }}>
     <Icon size={14} /> {label}
   </button>
 );
