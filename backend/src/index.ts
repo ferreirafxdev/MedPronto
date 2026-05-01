@@ -252,6 +252,63 @@ app.post('/api/take-patient', authenticateToken, authorizeDoctor, async (req: an
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
 
+
+// -- Admin Management Routes --
+
+// 1. Doctors Management
+app.get('/api/admin/doctors', authenticateToken, authorizeAdmin, async (req, res) => {
+  try {
+    const { data: doctors, error } = await supabase.from('doctors').select('*').order('name');
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true, doctors });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/admin/doctors', authenticateToken, authorizeAdmin, async (req, res) => {
+  try {
+    const { name, crm, email, password, specialty } = req.body;
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const { data: doctor, error } = await supabase.from('doctors').insert([{ name, crm, email, password: hashedPassword, specialty }]).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true, doctor });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/admin/doctors/:id', authenticateToken, authorizeAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { error } = await supabase.from('doctors').delete().eq('id', id);
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+// 2. Patient Management & Records
+app.get('/api/admin/patients', authenticateToken, authorizeAdmin, async (req, res) => {
+  try {
+    const { search } = req.query;
+    let query = supabase.from('patients').select('*').order('name');
+    if (search) {
+      query = query.or(`name.ilike.%${search}%,cpf.eq.${search}`);
+    }
+    const { data: patients, error } = await query;
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ success: true, patients });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/admin/patients/:id/record', authenticateToken, authorizeAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data: patient } = await supabase.from('patients').select('*').eq('id', id).single();
+    const { data: consultations } = await supabase.from('consultations').select('*').eq('patient_id', id).order('created_at', { ascending: false });
+    const { data: atestados } = await supabase.from('atestados').select('*').eq('patient_id', id).order('created_at', { ascending: false });
+    
+    res.json({ success: true, patient, record: { consultations, atestados } });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
+
 app.post('/api/atestado', authenticateToken, authorizeDoctor, async (req, res) => {
   try {
     const { patientId, doctorId, daysOff, cid, content } = req.body;
