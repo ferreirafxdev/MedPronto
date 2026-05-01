@@ -58,6 +58,7 @@ const allowedOrigins = [
 
 app.use(helmet({ contentSecurityPolicy: false })); // Disable CSP for local testing/dashboards if needed
 app.use(cors({ origin: allowedOrigins, credentials: true }));
+app.set('trust proxy', 1);
 app.use(express.json());
 
 // -- Infrastructure Dashboard (Queues) --
@@ -262,6 +263,16 @@ app.get('/api/validate-document/:code', validateLimiter, async (req, res) => {
     res.status(404).json({ error: 'Não encontrado' });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
 });
+
+app.get('/api/patient/check-queue/:patientId', async (req, res) => {
+  try {
+    const { patientId } = req.params;
+    const { data: queueEntry } = await supabase.from('queue').select('*').eq('patient_id', patientId).eq('status', 'waiting').single();
+    if (queueEntry) return res.json({ inQueue: true, entry: queueEntry });
+    res.json({ inQueue: false });
+  } catch (err: any) { res.status(500).json({ error: err.message }); }
+});
+
 
 app.post('/api/payment/pix-simulate', async (req, res) => {
   try {
