@@ -8,7 +8,6 @@ CREATE TABLE IF NOT EXISTS patients (
     age TEXT,
     email TEXT,
     birth_date TEXT,
-    birth_date TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -19,6 +18,7 @@ CREATE TABLE IF NOT EXISTS doctors (
     cpf TEXT UNIQUE, -- Added for Bird ID
     email TEXT UNIQUE NOT NULL,
     password TEXT NOT NULL,
+    specialty TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS atestados (
     days_off INTEGER,
     cid TEXT,
     content TEXT, -- Digital content for dynamic preview
+    download_released BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -46,6 +47,7 @@ CREATE TABLE IF NOT EXISTS consultations (
     exams TEXT,
     content TEXT, -- Full digital content
     validation_code TEXT,
+    download_released BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 

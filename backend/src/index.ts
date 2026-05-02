@@ -379,7 +379,7 @@ app.get('/api/patient/check-queue/:patientId', async (req, res) => {
     const { data: queueEntry } = await supabase.from('queue').select('*').eq('patient_id', patientId).eq('status', 'waiting').single();
     
     // 2. Check if patient has an active consultation (doctor called)
-    const { data: activeConsultation } = await supabase.from('consultations').select('*').eq('patient_id', patientId).eq('status', 'active').single();
+    const { data: activeConsultation } = await supabase.from('queue').select('*').eq('patient_id', patientId).eq('status', 'in-consultation').single();
 
     if (activeConsultation) {
       return res.json({ isActive: true, inQueue: false, roomId: patientId });
