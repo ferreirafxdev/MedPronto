@@ -16,16 +16,22 @@ export const enqueuePatient = async (req: any, res: Response) => {
       console.warn('[Queue] Redis warning (continuing with DB):', redisErr);
     }
 
-    // Upsert logic for better reliability
-    const { error } = await supabase
-      .from('queue')
-      .upsert({ 
-        patient_id: id, 
-        name, 
-        complaint, 
-        status: 'waiting', 
-        created_at: new Date().toISOString() 
-      }, { onConflict: 'patient_id' });
+    // Safer logic than upsert if unique constraint is missing
+    const { data: existing } = await supabase.from('queue').select('id').eq('patient_id', id).maybeSingle();
+
+    let error;
+    if (existing) {
+      const { error: updateError } = await supabase
+        .from('queue')
+        .update({ name, complaint, status: 'waiting', created_at: new Date().toISOString() })
+        .eq('patient_id', id);
+      error = updateError;
+    } else {
+      const { error: insertError } = await supabase
+        .from('queue')
+        .insert([{ patient_id: id, name, complaint, status: 'waiting', created_at: new Date().toISOString() }]);
+      error = insertError;
+    }
 
     if (error) return res.status(500).json({ error: error.message });
 

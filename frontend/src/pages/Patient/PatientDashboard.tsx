@@ -29,7 +29,10 @@ const PatientDashboard = () => {
         localStorage.removeItem('payment_confirmed');
         setShowComplaintModal(false);
       }
-    } catch (e) { console.error("Erro ao entrar na fila"); } finally { setLoading(false); }
+    } catch (e: any) { 
+      console.error("Erro ao entrar na fila", e);
+      alert(e.response?.data?.error || "Erro ao entrar na fila. Tente novamente.");
+    } finally { setLoading(false); }
   }, [user, complaint]);
 
   useEffect(() => {
