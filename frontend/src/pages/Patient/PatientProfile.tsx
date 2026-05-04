@@ -75,7 +75,7 @@ const PatientProfile = () => {
       const resp = await apiClient.get(`/api/patient/history/${user?.cpf}`);
       if (resp.data.success) {
         setData(resp.data);
-        if (resp.data.atestados.length > 0) {
+        if (resp.data.atestados && resp.data.atestados.length > 0) {
           setSelectedAtestado(resp.data.atestados[0]);
         }
       }
@@ -138,17 +138,17 @@ const PatientProfile = () => {
             <User size={26} color="white" />
           </div>
           <div style={{ minWidth: 0 }}>
-            <h3 style={{ margin: 0, fontSize: '1.15rem', color: 'var(--text-heading)' }}>{data?.patient.name}</h3>
+            <h3 style={{ margin: 0, fontSize: '1.15rem', color: 'var(--text-heading)' }}>{data?.patient?.name || 'Carregando...'}</h3>
             <div style={{ display: 'flex', gap: '1rem', marginTop: '0.35rem', flexWrap: 'wrap' }}>
-              <InfoPill icon={<Hash size={12} />} text={data?.patient.cpf || ''} />
-              <InfoPill icon={<Mail size={12} />} text={data?.patient.email || ''} />
-              <InfoPill icon={<Calendar size={12} />} text={`${data?.patient.age} anos`} />
+              <InfoPill icon={<Hash size={12} />} text={data?.patient?.cpf || ''} />
+              <InfoPill icon={<Mail size={12} />} text={data?.patient?.email || ''} />
+              <InfoPill icon={<Calendar size={12} />} text={data?.patient?.age ? `${data.patient.age} anos` : ''} />
             </div>
           </div>
         </div>
-
-        <StatMini icon={<Stethoscope size={18} />} bg="var(--accent-ultra-light)" color="var(--accent)" label="Consultas" value={data?.summary.totalConsultations || 0} />
-        <StatMini icon={<Shield size={18} />} bg="var(--mint-light)" color="var(--mint)" label="Atestados" value={data?.summary.totalAtestados || 0} />
+ 
+        <StatMini icon={<Stethoscope size={18} />} bg="var(--accent-ultra-light)" color="var(--accent)" label="Consultas" value={data?.summary?.totalConsultations || 0} />
+        <StatMini icon={<Shield size={18} />} bg="var(--mint-light)" color="var(--mint)" label="Atestados" value={data?.summary?.totalAtestados || 0} />
       </div>
 
       {/* Tabs + Content */}
@@ -185,12 +185,12 @@ const PatientProfile = () => {
               <h3 style={{ fontSize: '1.05rem', marginBottom: '1rem' }}>Resumo da Conta</h3>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.65rem', marginBottom: '1.5rem' }}>
-                <InfoField label="Nome Completo" value={data?.patient.name || ''} />
-                <InfoField label="CPF" value={data?.patient.cpf || ''} />
-                <InfoField label="E-mail" value={data?.patient.email || ''} />
-                <InfoField label="Idade" value={`${data?.patient.age} anos`} />
-                <InfoField label="Cadastrado em" value={data?.patient.created_at ? new Date(data.patient.created_at).toLocaleDateString('pt-BR') : '—'} />
-                <InfoField label="Última Consulta" value={data?.summary.lastVisit ? new Date(data.summary.lastVisit).toLocaleDateString('pt-BR') : 'Nenhuma'} />
+                <InfoField label="Nome Completo" value={data?.patient?.name || ''} />
+                <InfoField label="CPF" value={data?.patient?.cpf || ''} />
+                <InfoField label="E-mail" value={data?.patient?.email || ''} />
+                <InfoField label="Idade" value={data?.patient?.age ? `${data.patient.age} anos` : ''} />
+                <InfoField label="Cadastrado em" value={data?.patient?.created_at ? new Date(data.patient.created_at).toLocaleDateString('pt-BR') : '—'} />
+                <InfoField label="Última Consulta" value={data?.summary?.lastVisit ? new Date(data.summary.lastVisit).toLocaleDateString('pt-BR') : 'Nenhuma'} />
               </div>
 
               {data && data.consultations.length > 0 && (
@@ -326,7 +326,7 @@ const PatientProfile = () => {
                      <div style={{ flexGrow: 1, background: '#fff', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '2rem', boxShadow: 'inset 0 0 10px rgba(0,0,0,0.02)', position: 'relative' }}>
                         {selectedAtestado ? (
                           <div className="certificate-content" style={{ fontFamily: 'serif', color: '#1e293b', lineHeight: 1.8 }}>
-                             <div style={{ textAlign: 'center', marginBottom: '2.5rem', borderBottom: '2px solid var(--mint)', pb: '1rem' }}>
+                             <div style={{ textAlign: 'center', marginBottom: '2.5rem', borderBottom: '2px solid var(--mint)', paddingBottom: '1rem' }}>
                                 <h2 style={{ fontSize: '1.5rem', color: 'var(--navy-dark)', letterSpacing: '0.1em' }}>ATESTADO MÉDICO</h2>
                              </div>
                              
