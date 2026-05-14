@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import apiClient from '../../api/client';
 import { Edit3, PenTool, FileText, Clock } from 'lucide-react';
-import JitsiVideo from '../../components/JitsiVideo';
+import LiveKitVideo from '../../components/LiveKitVideo';
 
 /**
  * Tela de Sala de Consulta (Médico)
@@ -109,7 +109,7 @@ const ConsultationRoom = () => {
       <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 420px' }}>
         {/* Área de Vídeo */}
         <div style={{ position: 'relative', background: '#000' }}>
-           <JitsiVideo roomName={roomId || 'default'} userName={user?.name || 'Médico'} />
+           <LiveKitVideo roomName={roomId || 'default'} userName={user?.name || 'Médico'} />
         </div>
 
         {/* Área Lateral: Prontuário e Abas */}

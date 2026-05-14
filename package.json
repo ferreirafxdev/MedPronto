@@ -4,6 +4,7 @@
     "build": "cd backend && npm install && npm run build"
   },
   "dependencies": {
+    "livekit-server-sdk": "^2.15.3",
     "socket.io": "^4.8.3"
   },
   "optionalDependencies": {

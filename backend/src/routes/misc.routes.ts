@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { supabase } from '../utils/supabase';
+import { getLiveKitToken } from '../controllers/livekit.controller';
 
 const router = Router();
 
@@ -20,5 +21,7 @@ router.post('/payment/pix-simulate', async (req, res) => {
   const pixKey = '00020126580014BR.GOV.BCB.PIX01366366f1-med-pronto-pix-key-2026520400005303986540550.005802BR5925MEDPRONTO TELEMEDICINA6009SAO PAULO62070503***6304E2B1';
   res.json({ success: true, pixKey });
 });
+
+router.get('/livekit/token', getLiveKitToken);
 
 export default router;
