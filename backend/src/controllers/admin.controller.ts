@@ -44,9 +44,20 @@ export const createDoctor = async (req: Request, res: Response) => {
   try {
     const { name, crm, email, password, specialty, cpf } = req.body;
     const hashedPassword = await bcrypt.hash(password, 10);
+    
+    // Treat empty CPF as null to avoid unique constraint issues with empty strings
+    const doctorData = { 
+      name, 
+      crm, 
+      email, 
+      password: hashedPassword, 
+      specialty, 
+      cpf: cpf && cpf.trim() !== '' ? cpf : null 
+    };
+
     const { data: doctor, error } = await supabase
       .from('doctors')
-      .insert([{ name, crm, email, password: hashedPassword, specialty, cpf }])
+      .insert([doctorData])
       .select()
       .single();
 
