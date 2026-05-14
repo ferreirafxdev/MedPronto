@@ -34,7 +34,7 @@ export const doctorAuth = async (req: Request, res: Response) => {
     const { data: doctor, error } = await supabase
       .from('doctors')
       .select('*')
-      .or(`crm.eq.${login},email.eq.${login}`)
+      .or(`crm.eq.${login},email.eq.${login},cpf.eq.${login}`)
       .single();
 
     if (error || !doctor || !doctor.password) return res.status(401).json({ error: 'Credenciais inválidas' });

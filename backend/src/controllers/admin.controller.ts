@@ -42,11 +42,11 @@ export const getDoctors = async (req: Request, res: Response) => {
 
 export const createDoctor = async (req: Request, res: Response) => {
   try {
-    const { name, crm, email, password, specialty } = req.body;
+    const { name, crm, email, password, specialty, cpf } = req.body;
     const hashedPassword = await bcrypt.hash(password, 10);
     const { data: doctor, error } = await supabase
       .from('doctors')
-      .insert([{ name, crm, email, password: hashedPassword, specialty }])
+      .insert([{ name, crm, email, password: hashedPassword, specialty, cpf }])
       .select()
       .single();
 

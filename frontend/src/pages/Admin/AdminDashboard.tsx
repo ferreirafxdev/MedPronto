@@ -20,7 +20,7 @@ const AdminDashboard = () => {
   // -- Doctors State --
   const [doctors, setDoctors] = useState<any[]>([]);
   const [showAddDoctor, setShowAddDoctor] = useState(false);
-  const [newDoctor, setNewDoctor] = useState({ name: '', crm: '', email: '', password: '', specialty: '' });
+  const [newDoctor, setNewDoctor] = useState({ name: '', crm: '', email: '', password: '', specialty: '', cpf: '' });
 
   // -- Patients State --
   const [patients, setPatients] = useState<any[]>([]);
@@ -67,7 +67,7 @@ const AdminDashboard = () => {
     try {
       await apiClient.post('/api/admin/doctors', newDoctor);
       setShowAddDoctor(false);
-      setNewDoctor({ name: '', crm: '', email: '', password: '', specialty: '' });
+      setNewDoctor({ name: '', crm: '', email: '', password: '', specialty: '', cpf: '' });
       fetchData();
     } catch (e) { alert("Erro ao cadastrar médico"); }
     finally { setLoading(false); }
@@ -208,6 +208,7 @@ CID: ${a.cid}
                     <tr>
                       <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>MÉDICO</th>
                       <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>CRM</th>
+                      <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>CPF</th>
                       <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>ESPECIALIDADE</th>
                       <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>EMAIL</th>
                       <th style={{ padding: '1rem 1.5rem', textAlign: 'right' }}></th>
@@ -218,6 +219,7 @@ CID: ${a.cid}
                       <tr key={doc.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '1rem 1.5rem', fontWeight: 700, color: '#0f172a' }}>{doc.name}</td>
                         <td style={{ padding: '1rem 1.5rem', color: '#64748b' }}>{doc.crm}</td>
+                        <td style={{ padding: '1rem 1.5rem', color: '#64748b' }}>{doc.cpf || '-'}</td>
                         <td style={{ padding: '1rem 1.5rem' }}>
                           <span style={{ background: '#eff6ff', color: '#2563eb', padding: '0.25rem 0.6rem', borderRadius: '2rem', fontSize: '0.75rem', fontWeight: 600 }}>
                             {doc.specialty || 'Geral'}
@@ -328,7 +330,10 @@ CID: ${a.cid}
                   <div className="form-group"><label>CRM</label><input required className="form-control" value={newDoctor.crm} onChange={e => setNewDoctor({...newDoctor, crm: e.target.value})} /></div>
                   <div className="form-group"><label>Especialidade</label><input className="form-control" value={newDoctor.specialty} onChange={e => setNewDoctor({...newDoctor, specialty: e.target.value})} placeholder="Ex: Geral" /></div>
                 </div>
-                <div className="form-group"><label>Email</label><input required type="email" className="form-control" value={newDoctor.email} onChange={e => setNewDoctor({...newDoctor, email: e.target.value})} /></div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="form-group"><label>Email</label><input required type="email" className="form-control" value={newDoctor.email} onChange={e => setNewDoctor({...newDoctor, email: e.target.value})} /></div>
+                  <div className="form-group"><label>CPF</label><input required className="form-control" value={newDoctor.cpf} onChange={e => setNewDoctor({...newDoctor, cpf: e.target.value})} placeholder="000.000.000-00" /></div>
+                </div>
                 <div className="form-group"><label>Senha Inicial</label><input required type="password" className="form-control" value={newDoctor.password} onChange={e => setNewDoctor({...newDoctor, password: e.target.value})} /></div>
                 <button type="submit" className="btn btn-primary btn-full btn-lg" style={{ marginTop: '1rem' }} disabled={loading}>
                   {loading ? 'Cadastrando...' : 'Finalizar Cadastro'}
