@@ -24,6 +24,7 @@ router.get('/doctors', authenticateToken, authorizeAdmin, adminController.getDoc
 router.post('/doctors', authenticateToken, authorizeAdmin, adminController.createDoctor);
 router.delete('/doctors/:id', authenticateToken, authorizeAdmin, adminController.deleteDoctor);
 router.get('/patients', authenticateToken, authorizeAdmin, adminController.getPatients);
+router.get('/patients/:patientId/record', authenticateToken, authorizeAdmin, adminController.getPatientRecord);
 router.post('/release-document', authenticateToken, authorizeAdmin, adminController.releaseDocument);
 
 export default router;

@@ -171,9 +171,9 @@ CID: ${a.cid}
         {activeTab === 'infra' && status && (
           <div className="animate-fade-in" style={{ display: 'grid', gap: '2rem' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
-              <StatusCard label="Status API" status={status.services.api} icon={<Activity size={24} />} />
-              <StatusCard label="Supabase DB" status={status.services.supabase} icon={<Database size={24} />} />
-              <StatusCard label="Redis Queue" status={status.services.redis} icon={<RefreshCw size={24} />} />
+              <StatusCard label="Status API" status={status?.services?.api} icon={<Activity size={24} />} />
+              <StatusCard label="Supabase DB" status={status?.services?.supabase} icon={<Database size={24} />} />
+              <StatusCard label="Redis Queue" status={status?.services?.redis} icon={<RefreshCw size={24} />} />
             </div>
 
             <div style={{ background: '#020617', borderRadius: '1.5rem', padding: '1.5rem', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
@@ -182,11 +182,12 @@ CID: ${a.cid}
                 <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'white' }}>Console de Logs do Servidor</h3>
               </div>
               <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '1rem', padding: '1rem', height: '400px', overflowY: 'auto', fontFamily: '"JetBrains Mono", monospace', fontSize: '0.85rem', border: '1px solid rgba(255,255,255,0.05)' }}>
-                {status.logs.map((log: string, i: number) => (
+                {status?.logs?.map((log: string, i: number) => (
                   <div key={i} style={{ padding: '0.4rem 0', color: log.includes('200') ? '#10b981' : log.includes('404') || log.includes('500') ? '#f43f5e' : '#94a3b8', borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
                     {log}
                   </div>
                 ))}
+                {(!status?.logs || status.logs.length === 0) && <div style={{ color: '#64748b', padding: '1rem' }}>Aguardando logs do sistema...</div>}
               </div>
             </div>
           </div>

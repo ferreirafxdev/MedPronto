@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { supabase } from '../utils/supabase';
 import { patientQueue, documentQueue } from '../queue';
+import { serverLogs } from '../index';
 
 export const getInfraStatus = async (req: Request, res: Response) => {
   try {
@@ -23,7 +24,8 @@ export const getInfraStatus = async (req: Request, res: Response) => {
       queues: {
         waiting: await patientQueue.count(),
         documents: await documentQueue.count(),
-      }
+      },
+      logs: serverLogs
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -83,4 +85,29 @@ export const releaseDocument = async (req: Request, res: Response) => {
     if (error) return res.status(500).json({ error: error.message });
     res.json({ success: true });
   } catch (err: any) { res.status(500).json({ error: err.message }); }
+};
+
+export const getPatientRecord = async (req: Request, res: Response) => {
+  try {
+    const { patientId } = req.params;
+
+    const [patientRes, consultationsRes, atestadosRes] = await Promise.all([
+      supabase.from('patients').select('*').eq('id', patientId).single(),
+      supabase.from('consultations').select('*').eq('patient_id', patientId).order('created_at', { ascending: false }),
+      supabase.from('atestados').select('*').eq('patient_id', patientId).order('created_at', { ascending: false })
+    ]);
+
+    if (patientRes.error) return res.status(404).json({ error: 'Paciente não encontrado' });
+
+    res.json({
+      success: true,
+      patient: patientRes.data,
+      record: {
+        consultations: consultationsRes.data || [],
+        atestados: atestadosRes.data || []
+      }
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 };

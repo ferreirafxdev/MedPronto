@@ -35,6 +35,20 @@ app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.set('trust proxy', 1);
 app.use(express.json());
 app.use(morgan('dev'));
+export const serverLogs: string[] = [];
+app.use(morgan((tokens, req, res) => {
+  const log = [
+    tokens.method(req, res),
+    tokens.url(req, res),
+    tokens.status(req, res),
+    tokens.res(req, res, 'content-length'), '-',
+    tokens['response-time'](req, res), 'ms'
+  ].join(' ');
+  serverLogs.push(`[${new Date().toISOString()}] ${log}`);
+  if (serverLogs.length > 50) serverLogs.shift();
+  return null;
+}));
+
 
 const generalLimiter = rateLimit({ windowMs: 1 * 60 * 1000, max: 100 });
 app.use(generalLimiter);
