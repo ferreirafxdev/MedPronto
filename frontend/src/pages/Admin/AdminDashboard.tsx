@@ -1,35 +1,42 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Activity, Server, Database, Terminal, Shield, RefreshCw, 
-  UserPlus, Users, Search, Trash2, Clipboard, FileText, 
-  Download, Filter, ChevronRight, X, UserCheck
+  UserPlus, Users, Search, Trash2, FileText, 
+  Download, ChevronRight, X
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import apiClient from '../../api/client';
 import { useNavigate } from 'react-router-dom';
 
+/**
+ * Painel Administrativo Central
+ * Gerencia infraestrutura, equipe médica, prontuários de pacientes e fila de espera.
+ */
 const AdminDashboard = () => {
   const { user } = useStore();
   const navigate = useNavigate();
+  
+  // -- Controle de Navegação Interna --
   const [activeTab, setActiveTab] = useState<'infra' | 'doctors' | 'patients' | 'queue'>('infra');
   const [loading, setLoading] = useState(false);
 
-  // -- Infra State --
+  // -- Estado da Infraestrutura (API, Supabase, Redis e Logs) --
   const [status, setStatus] = useState<any>(null);
 
-  // -- Doctors State --
+  // -- Estado da Equipe Médica --
   const [doctors, setDoctors] = useState<any[]>([]);
   const [showAddDoctor, setShowAddDoctor] = useState(false);
   const [newDoctor, setNewDoctor] = useState({ name: '', crm: '', email: '', password: '', specialty: '', cpf: '' });
 
-  // -- Patients State --
+  // -- Estado dos Pacientes e Prontuários --
   const [patients, setPatients] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedRecord, setSelectedRecord] = useState<any>(null);
+  const [selectedRecord, setSelectedRecord] = useState<any>(null); // Prontuário sendo visualizado no modal
 
-  // -- Queue State --
+  // -- Estado da Fila de Espera em Tempo Real --
   const [queue, setQueue] = useState<any[]>([]);
 
+  // Carrega os dados da aba ativa ao montar ou mudar de aba
   useEffect(() => {
     if (!user || user.role !== 'admin') {
       navigate('/admin/login');
@@ -38,6 +45,9 @@ const AdminDashboard = () => {
     fetchData();
   }, [user, activeTab]);
 
+  /**
+   * Busca dados do backend conforme a aba selecionada
+   */
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -55,12 +65,15 @@ const AdminDashboard = () => {
         setQueue(resp.data.queue);
       }
     } catch (e) {
-      console.error("Error fetching admin data", e);
+      console.error("Erro ao buscar dados administrativos", e);
     } finally {
       setLoading(false);
     }
   };
 
+  /**
+   * Cadastra um novo médico
+   */
   const handleAddDoctor = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -68,39 +81,60 @@ const AdminDashboard = () => {
       await apiClient.post('/api/admin/doctors', newDoctor);
       setShowAddDoctor(false);
       setNewDoctor({ name: '', crm: '', email: '', password: '', specialty: '', cpf: '' });
-      fetchData();
-    } catch (e) { alert("Erro ao cadastrar médico"); }
-    finally { setLoading(false); }
+      fetchData(); // Atualiza a lista
+    } catch (e) { 
+        alert("Erro ao cadastrar médico. Verifique se o CRM ou Email já existem."); 
+    } finally { 
+        setLoading(false); 
+    }
   };
 
+  /**
+   * Remove um médico do sistema
+   */
   const handleDeleteDoctor = async (id: string) => {
-    if (!window.confirm("Deseja realmente excluir este médico?")) return;
+    if (!window.confirm("Deseja realmente excluir este médico? Esta ação é irreversível.")) return;
     try {
       await apiClient.delete(`/api/admin/doctors/${id}`);
       fetchData();
-    } catch (e) { alert("Erro ao excluir"); }
+    } catch (e) { 
+        alert("Erro ao excluir médico."); 
+    }
   };
 
+  /**
+   * Busca e abre o prontuário completo de um paciente
+   */
   const handleViewRecord = async (patientId: string) => {
     setLoading(true);
     try {
       const resp = await apiClient.get(`/api/admin/patients/${patientId}/record`);
       setSelectedRecord(resp.data);
-    } catch (e) { alert("Erro ao carregar prontuário"); }
-    finally { setLoading(false); }
+    } catch (e) { 
+        alert("Erro ao carregar prontuário."); 
+    } finally { 
+        setLoading(false); 
+    }
   };
 
+  /**
+   * Libera ou bloqueia o download de documentos para o paciente
+   */
   const handleReleaseDocument = async (type: 'ATESTADO' | 'RECEITA', id: string, released: boolean) => {
     try {
       await apiClient.post('/api/admin/release-document', { type, id, released });
-      // Refresh local state
+      // Atualiza o modal localmente para refletir a mudança
       if (selectedRecord) {
         handleViewRecord(selectedRecord.patient.id);
       }
-    } catch (e) { alert("Erro ao atualizar liberação"); }
+    } catch (e) { 
+        alert("Erro ao atualizar status de liberação."); 
+    }
   };
 
-
+  /**
+   * Gera uma versão em texto do prontuário para download (Backup Admin)
+   */
   const downloadRecord = (record: any) => {
     const content = `
 PRONTUÁRIO MÉDICO - MEDPRONTO
@@ -112,6 +146,8 @@ Email: ${record.patient.email}
 HISTÓRICO DE CONSULTAS:
 ${record.record.consultations.map((c: any) => `
 Data: ${new Date(c.created_at).toLocaleDateString()}
+Médico: ${c.doctor_name || 'N/A'}
+CRM: ${c.doctor_crm || 'N/A'}
 Notas: ${c.notes}
 Prescrições: ${c.prescriptions}
 --------------------------------`).join('')}
@@ -122,6 +158,7 @@ Data: ${new Date(a.created_at).toLocaleDateString()}
 Código: ${a.code}
 Dias: ${a.days_off}
 CID: ${a.cid}
+Médico: ${a.doctor_name}
 --------------------------------`).join('')}
     `;
     const blob = new Blob([content], { type: 'text/plain' });
@@ -136,50 +173,51 @@ CID: ${a.cid}
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#f8fafc' }}>
-      {/* Sidebar */}
+      {/* Sidebar de Navegação */}
       <aside style={{ width: '280px', background: '#0f172a', color: 'white', padding: '2rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0 0.5rem' }}>
           <div style={{ width: '32px', height: '32px', background: 'var(--accent)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Shield size={18} color="white" />
           </div>
-          <span style={{ fontWeight: 800, fontSize: '1.25rem', letterSpacing: '-0.02em' }}>Admin Control</span>
+          <span style={{ fontWeight: 800, fontSize: '1.25rem', letterSpacing: '-0.02em' }}>MedPronto Admin</span>
         </div>
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
           <SidebarLink active={activeTab === 'infra'} onClick={() => setActiveTab('infra')} icon={<Server size={18} />} label="Infra & Logs" />
           <SidebarLink active={activeTab === 'doctors'} onClick={() => setActiveTab('doctors')} icon={<Users size={18} />} label="Gestão de Médicos" />
-          <SidebarLink active={activeTab === 'patients'} onClick={() => setActiveTab('patients')} icon={<Clipboard size={18} />} label="Prontuários & Pacientes" />
+          <SidebarLink active={activeTab === 'patients'} onClick={() => setActiveTab('patients')} icon={<FileText size={18} />} label="Prontuários" />
           <SidebarLink active={activeTab === 'queue'} onClick={() => setActiveTab('queue')} icon={<Activity size={18} />} label="Monitor da Fila" />
         </nav>
       </aside>
 
-      {/* Main Content */}
+      {/* Área Principal de Conteúdo */}
       <main style={{ flex: 1, padding: '2.5rem', overflowY: 'auto' }}>
         <header style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h1 style={{ fontSize: '1.85rem', fontWeight: 800, color: '#0f172a', marginBottom: '0.25rem' }}>
               {activeTab === 'infra' ? 'Infraestrutura' : activeTab === 'doctors' ? 'Equipe Médica' : activeTab === 'patients' ? 'Histórico de Pacientes' : 'Gerenciamento de Fila'}
             </h1>
-            <p style={{ color: '#64748b', fontSize: '0.95rem' }}>Painel Administrativo MedPronto</p>
+            <p style={{ color: '#64748b', fontSize: '0.95rem' }}>Gerenciamento total do ecossistema médico</p>
           </div>
           <button onClick={fetchData} className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Atualizar
+            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Atualizar Dados
           </button>
         </header>
 
-        {/* Tab Content: Infra */}
+        {/* --- ABA INFRAESTRUTURA --- */}
         {activeTab === 'infra' && status && (
           <div className="animate-fade-in" style={{ display: 'grid', gap: '2rem' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
               <StatusCard label="Status API" status={status?.services?.api} icon={<Activity size={24} />} />
-              <StatusCard label="Supabase DB" status={status?.services?.supabase} icon={<Database size={24} />} />
-              <StatusCard label="Redis Queue" status={status?.services?.redis} icon={<RefreshCw size={24} />} />
+              <StatusCard label="Banco de Dados (Supabase)" status={status?.services?.supabase} icon={<Database size={24} />} />
+              <StatusCard label="Fila Redis" status={status?.services?.redis} icon={<RefreshCw size={24} />} />
             </div>
 
+            {/* Console de Logs em Tempo Real */}
             <div style={{ background: '#020617', borderRadius: '1.5rem', padding: '1.5rem', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem', color: 'white' }}>
                 <Terminal size={20} color="#10b981" />
-                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'white' }}>Console de Logs do Servidor</h3>
+                <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'white' }}>Console de Logs do Servidor (Morgan)</h3>
               </div>
               <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '1rem', padding: '1rem', height: '400px', overflowY: 'auto', fontFamily: '"JetBrains Mono", monospace', fontSize: '0.85rem', border: '1px solid rgba(255,255,255,0.05)' }}>
                 {status?.logs?.map((log: string, i: number) => (
@@ -187,18 +225,18 @@ CID: ${a.cid}
                     {log}
                   </div>
                 ))}
-                {(!status?.logs || status.logs.length === 0) && <div style={{ color: '#64748b', padding: '1rem' }}>Aguardando logs do sistema...</div>}
+                {(!status?.logs || status.logs.length === 0) && <div style={{ color: '#64748b', padding: '1rem' }}>Aguardando tráfego no sistema para gerar logs...</div>}
               </div>
             </div>
           </div>
         )}
 
-        {/* Tab Content: Doctors */}
+        {/* --- ABA EQUIPE MÉDICA --- */}
         {activeTab === 'doctors' && (
           <div className="animate-fade-in">
             <div style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
                <button onClick={() => setShowAddDoctor(true)} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                 <UserPlus size={18} /> Cadastrar Médico
+                 <UserPlus size={18} /> Novo Médico
                </button>
             </div>
 
@@ -206,12 +244,12 @@ CID: ${a.cid}
                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                   <thead style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                     <tr>
-                      <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>MÉDICO</th>
+                      <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>NOME</th>
                       <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>CRM</th>
                       <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>CPF</th>
                       <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>ESPECIALIDADE</th>
                       <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>EMAIL</th>
-                      <th style={{ padding: '1rem 1.5rem', textAlign: 'right' }}></th>
+                      <th style={{ padding: '1rem 1.5rem', textAlign: 'right' }}>AÇÕES</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -239,9 +277,10 @@ CID: ${a.cid}
           </div>
         )}
 
-        {/* Tab Content: Patients */}
+        {/* --- ABA PRONTUÁRIOS (PACIENTES) --- */}
         {activeTab === 'patients' && (
           <div className="animate-fade-in">
+             {/* Barra de Busca de Paciente */}
              <div style={{ marginBottom: '1.5rem', position: 'relative', maxWidth: '500px' }}>
                 <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                 <input 
@@ -261,8 +300,8 @@ CID: ${a.cid}
                     <tr>
                       <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>PACIENTE</th>
                       <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>CPF</th>
-                      <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>ÚLTIMA ATUALIZAÇÃO</th>
-                      <th style={{ padding: '1rem 1.5rem', textAlign: 'right' }}></th>
+                      <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>DATA CADASTRO</th>
+                      <th style={{ padding: '1rem 1.5rem', textAlign: 'right' }}>AÇÕES</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -273,7 +312,7 @@ CID: ${a.cid}
                         <td style={{ padding: '1rem 1.5rem', color: '#94a3b8', fontSize: '0.85rem' }}>{new Date(p.created_at).toLocaleDateString()}</td>
                         <td style={{ padding: '1rem 1.5rem', textAlign: 'right' }}>
                            <button onClick={() => handleViewRecord(p.id)} className="btn btn-outline btn-sm" style={{ gap: '0.4rem' }}>
-                             <FileText size={14} /> Abrir Prontuário
+                             <FileText size={14} /> Abrir Prontuário Completo
                            </button>
                         </td>
                       </tr>
@@ -284,7 +323,7 @@ CID: ${a.cid}
           </div>
         )}
 
-        {/* Tab Content: Queue */}
+        {/* --- ABA MONITOR DA FILA --- */}
         {activeTab === 'queue' && (
           <div className="animate-fade-in">
              <div className="premium-card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -293,8 +332,8 @@ CID: ${a.cid}
                     <tr>
                       <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>POSIÇÃO</th>
                       <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>PACIENTE</th>
-                      <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>TEMPO DE ESPERA</th>
-                      <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>QUEIXA</th>
+                      <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>HORA DE ENTRADA</th>
+                      <th style={{ padding: '1rem 1.5rem', fontSize: '0.75rem', fontWeight: 800, color: '#64748b' }}>QUEIXA / SINTOMAS</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -308,7 +347,7 @@ CID: ${a.cid}
                     ))}
                     {queue.length === 0 && (
                       <tr>
-                        <td colSpan={4} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>Fila vazia no momento.</td>
+                        <td colSpan={4} style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>Não há pacientes aguardando na fila.</td>
                       </tr>
                     )}
                   </tbody>
@@ -318,7 +357,7 @@ CID: ${a.cid}
         )}
       </main>
 
-      {/* Modal: Add Doctor */}
+      {/* --- MODAL: CADASTRO DE MÉDICO --- */}
       {showAddDoctor && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(8px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
           <div className="premium-card" style={{ maxWidth: '480px', width: '100%', position: 'relative' }}>
@@ -343,29 +382,32 @@ CID: ${a.cid}
         </div>
       )}
 
-      {/* Modal: Patient Record */}
+      {/* --- MODAL: PRONTUÁRIO DO PACIENTE --- */}
       {selectedRecord && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.7)', backdropFilter: 'blur(8px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
           <div className="premium-card" style={{ maxWidth: '800px', width: '100%', height: '85vh', position: 'relative', display: 'flex', flexDirection: 'column' }}>
              <button onClick={() => setSelectedRecord(null)} style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}><X size={24}/></button>
              
+             {/* Cabeçalho do Prontuário */}
              <div style={{ paddingBottom: '1.5rem', borderBottom: '1px solid #e2e8f0', marginBottom: '1.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                    <div>
                      <h2 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>{selectedRecord.patient.name}</h2>
-                     <p style={{ color: '#64748b', fontSize: '0.9rem' }}>CPF: {selectedRecord.patient.cpf} | Paciente desde {new Date(selectedRecord.patient.created_at).toLocaleDateString()}</p>
+                     <p style={{ color: '#64748b', fontSize: '0.9rem' }}>CPF: {selectedRecord.patient.cpf} | Cadastro em {new Date(selectedRecord.patient.created_at).toLocaleDateString()}</p>
                    </div>
                    <button onClick={() => downloadRecord(selectedRecord)} className="btn btn-outline" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                     <Download size={16} /> Baixar PDF Prontuário
+                     <Download size={16} /> Exportar Prontuário (TXT)
                    </button>
                 </div>
              </div>
 
+             {/* Corpo: Consultas e Atestados */}
              <div style={{ flex: 1, overflowY: 'auto', display: 'grid', gap: '2rem' }}>
+                {/* Seção de Evoluções Clínicas */}
                 <section>
                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem' }}>
                       <Activity size={18} color="var(--accent)" />
-                      <h3 style={{ margin: 0, fontSize: '1.1rem' }}>Evoluções & Consultas</h3>
+                      <h3 style={{ margin: 0, fontSize: '1.1rem' }}>Histórico de Evoluções & Receitas</h3>
                    </div>
                    <div style={{ display: 'grid', gap: '1rem' }}>
                       {selectedRecord.record.consultations.map((c: any) => (
@@ -393,15 +435,15 @@ CID: ${a.cid}
                            )}
                         </div>
                       ))}
-
-                      {selectedRecord.record.consultations.length === 0 && <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Nenhuma consulta registrada.</p>}
+                      {selectedRecord.record.consultations.length === 0 && <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Sem registros de consulta.</p>}
                    </div>
                 </section>
 
+                {/* Seção de Atestados */}
                 <section>
                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem' }}>
                       <FileText size={18} color="#10b981" />
-                      <h3 style={{ margin: 0, fontSize: '1.1rem' }}>Atestados Emitidos</h3>
+                      <h3 style={{ margin: 0, fontSize: '1.1rem' }}>Atestados Médicos</h3>
                    </div>
                    <div style={{ display: 'grid', gap: '1rem' }}>
                       {selectedRecord.record.atestados.map((a: any) => (
@@ -423,7 +465,6 @@ CID: ${a.cid}
                            </div>
                         </div>
                       ))}
-
                       {selectedRecord.record.atestados.length === 0 && <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Nenhum atestado emitido.</p>}
                    </div>
                 </section>
@@ -432,6 +473,7 @@ CID: ${a.cid}
         </div>
       )}
 
+      {/* Estilos Auxiliares */}
       <style>{`
         .animate-spin { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
@@ -442,6 +484,7 @@ CID: ${a.cid}
   );
 };
 
+// Componente de Link da Sidebar
 const SidebarLink = ({ active, onClick, icon, label }: any) => (
   <button 
     onClick={onClick} 
@@ -454,13 +497,12 @@ const SidebarLink = ({ active, onClick, icon, label }: any) => (
       cursor: 'pointer', transition: 'all 0.2s',
       textAlign: 'left'
     }}
-    onMouseOver={(e) => !active && (e.currentTarget.style.color = 'white')}
-    onMouseOut={(e) => !active && (e.currentTarget.style.color = '#94a3b8')}
   >
     {icon} {label}
   </button>
 );
 
+// Componente de Card de Status (Infra)
 const StatusCard = ({ label, status, icon }: any) => (
   <div className="premium-card" style={{ padding: '1.25rem', display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
     <div style={{ color: status === 'online' || status === 'connected' ? '#10b981' : '#f43f5e' }}>{icon}</div>
