@@ -49,8 +49,8 @@ app.use(morgan((tokens, req, res) => {
   // Adiciona o log ao buffer com timestamp
   serverLogs.push(`[${new Date().toISOString()}] ${log}`);
   
-  // Mantém apenas os últimos 50 logs para não estourar a memória
-  if (serverLogs.length > 50) serverLogs.shift();
+  // Mantém apenas os últimos 100 logs para não estourar a memória
+  if (serverLogs.length > 100) serverLogs.shift();
   return null; // Morgan continuará usando o log 'dev' padrão no console
 }));
 

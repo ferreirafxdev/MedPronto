@@ -17,9 +17,18 @@ router.get('/health', async (req, res) => {
   }
 });
 
-router.post('/payment/pix-simulate', async (req, res) => {
-  const pixKey = '00020126580014BR.GOV.BCB.PIX01366366f1-med-pronto-pix-key-2026520400005303986540550.005802BR5925MEDPRONTO TELEMEDICINA6009SAO PAULO62070503***6304E2B1';
-  res.json({ success: true, pixKey });
+router.post('/payment/confirm', async (req, res) => {
+  const { patientId } = req.body;
+  
+  // Aqui você integraria com o webhook do seu Gateway de Pagamento (Asaas, Mercado Pago, etc)
+  // Por enquanto, simulamos o sucesso gravando no banco de dados.
+  const { error } = await supabase
+    .from('patients')
+    .update({ has_active_payment: true })
+    .eq('id', patientId);
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true, message: 'Pagamento confirmado e registrado no banco.' });
 });
 
 router.get('/livekit/token', getLiveKitToken);

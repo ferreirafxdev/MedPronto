@@ -39,20 +39,22 @@ const PatientPayment = () => {
     alert("Chave PIX copiada com sucesso!");
   };
 
-  const handleConfirmPayment = () => {
+  const handleConfirmPayment = async () => {
+    if (!user) return;
     setLoading(true);
-    setTimeout(() => {
-      localStorage.setItem('payment_confirmed', 'true');
+    try {
+      // Chama o backend para validar e registrar o pagamento no banco de dados
+      await apiClient.post('/api/payment/confirm', { patientId: user.id });
+      
       setStep(3);
-      setLoading(false);
       setTimeout(() => {
-        if (user) {
-          navigate('/patient/dashboard?new_consultation=true');
-        } else {
-          navigate('/patient/login?mode=register');
-        }
+         navigate('/patient/dashboard?new_consultation=true');
       }, 2500);
-    }, 2000);
+    } catch (e) {
+      alert("Erro ao confirmar pagamento. Tente novamente ou entre em contato com o suporte.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

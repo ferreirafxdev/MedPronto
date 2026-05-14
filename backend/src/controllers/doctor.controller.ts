@@ -99,8 +99,11 @@ export const endConsultation = async (req: Request, res: Response) => {
       data: { patientId, doctorId, validationCode: consultationCode, notes, prescriptions, exams, content }
     });
 
-    // Remove o paciente da fila do Redis/DB após o atendimento
-    await supabase.from('queue').delete().eq('patient_id', patientId);
+    // Remove o paciente da fila e consome o crédito de pagamento
+    await Promise.all([
+       supabase.from('queue').delete().eq('patient_id', patientId),
+       supabase.from('patients').update({ has_active_payment: false }).eq('id', patientId)
+    ]);
     res.json({ success: true, message: 'Finalizado' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
