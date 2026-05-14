@@ -2,52 +2,55 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import apiClient from '../../api/client';
-import { Edit3, PenTool, FileText, Clock } from 'lucide-react';
+import { 
+  Edit3, PenTool, FileText, Clock, User, 
+  ChevronRight, Save, Info, AlertCircle 
+} from 'lucide-react';
 import LiveKitVideo from '../../components/LiveKitVideo';
 
 /**
- * Tela de Sala de Consulta (Médico)
- * Gerencia o vídeo, prontuário, receitas e atestados em tempo real.
+ * Sala de Consulta Profissional
+ * Layout otimizado: Vídeo (Topo Esquerdo), Info Paciente (Topo Direito), Prontuário (Base)
  */
 const ConsultationRoom = () => {
-  const { roomId } = useParams(); // ID da sala (geralmente o ID do paciente)
-  const { user } = useStore();    // Dados do médico logado
+  const { roomId } = useParams();
+  const { user } = useStore();
   const navigate = useNavigate();
   
-  // -- Estados da Interface --
-  const [activeTab, setActiveTab] = useState<'evolucao' | 'exames' | 'receituario' | 'atestado'>('evolucao');
+  const [activeTab, setActiveTab] = useState<'evolucao' | 'receituario' | 'atestado' | 'exames'>('evolucao');
   const [loading, setLoading] = useState(false);
-  const [consultationTime, setConsultationTime] = useState(0); // Cronômetro da consulta
+  const [consultationTime, setConsultationTime] = useState(0);
+  const [patient, setPatient] = useState<any>(null);
 
-  // -- Conteúdo do Prontuário --
-  const [notes, setNotes] = useState('');                 // Evolução clínica
-  const [prescriptionContent, setPrescriptionContent] = useState(''); // Texto da receita
-  const [exams, setExams] = useState('');                 // Pedidos de exames
-  
-  // -- Conteúdo do Atestado --
-  const [daysOff, setDaysOff] = useState('1');            // Dias de afastamento
-  const [cid, setCid] = useState('');                     // CID (opcional)
-  const [atestadoContent, setAtestadoContent] = useState(''); // Texto do atestado
+  // Estados dos documentos
+  const [notes, setNotes] = useState('');
+  const [prescriptionContent, setPrescriptionContent] = useState('');
+  const [exams, setExams] = useState('');
+  const [daysOff, setDaysOff] = useState('1');
+  const [cid, setCid] = useState('');
+  const [atestadoContent, setAtestadoContent] = useState('');
 
-  // Inicia o cronômetro ao carregar a página
   useEffect(() => { 
     const t = setInterval(() => setConsultationTime(p => p + 1), 1000); 
+    fetchPatientData();
     return () => clearInterval(t); 
   }, []);
-  
-  // Formata segundos em MM:SS
-  const formatTime = (s: number) => `${Math.floor(s/60).toString().padStart(2,'0')}:${(s%60).toString().padStart(2,'0')}`;
 
-  // Proteção de rota: apenas médicos
-  useEffect(() => {
-    if (!user || user.role !== 'doctor') { navigate('/doctor/login'); return; }
-  }, [user, navigate]);
+  const fetchPatientData = async () => {
+    try {
+        const resp = await apiClient.get(`/api/admin/patients/${roomId}/record`);
+        setPatient(resp.data.patient);
+    } catch (e) { console.error("Erro ao carregar dados do paciente"); }
+  };
 
-  /**
-   * Finaliza o atendimento enviando todos os dados para o backend
-   */
+  const formatTime = (s: number) => {
+    const mins = Math.floor(s/60);
+    const secs = s % 60;
+    return `${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+  };
+
   const endConsultation = async () => {
-    if(window.confirm("Deseja encerrar o atendimento e salvar os documentos?")) {
+    if(window.confirm("Deseja finalizar este atendimento? Os documentos serão gerados e salvos.")) {
       setLoading(true);
       try {
         await apiClient.post('/api/end-consultation', { 
@@ -56,113 +59,207 @@ const ConsultationRoom = () => {
           notes, 
           prescriptions: prescriptionContent, 
           exams, 
-          content: prescriptionContent,
-          // Dados do atestado (será processado apenas se houver conteúdo)
-          atestado: {
-            daysOff,
-            cid,
-            content: atestadoContent
-          }
+          atestado: atestadoContent ? { daysOff, cid, content: atestadoContent } : null
         });
-        navigate('/doctor/dashboard'); // Retorna ao painel após finalizar
+        navigate('/doctor/dashboard');
       } catch(err) { 
-        alert("Erro ao encerrar consulta. Verifique sua conexão."); 
-      } finally { 
-        setLoading(false); 
-      }
+        alert("Erro ao salvar consulta."); 
+      } finally { setLoading(false); }
     }
   };
 
-  // Componente auxiliar para títulos de seção
-  const SectionHeader = ({ icon: Icon, title, desc }: any) => (
-    <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-      <div style={{ background: '#eff6ff', color: '#2563eb', padding: '0.45rem', borderRadius: '0.75rem', display: 'flex' }}>
-        <Icon size={18} />
-      </div>
-      <div>
-        <h4 style={{ margin: 0, color: '#0f172a', fontSize: '0.95rem', fontWeight: 700 }}>{title}</h4>
-        <p style={{ margin: 0, fontSize: '0.75rem', color: '#64748b' }}>{desc}</p>
-      </div>
-    </div>
-  );
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#0f172a', overflow: 'hidden' }}>
-      {/* Barra de Topo */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1.5rem', background: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(10px)', borderBottom: '1px solid rgba(255,255,255,0.05)', zIndex: 10 }}>
+    <div style={{ 
+        height: '100vh', background: '#0f172a', display: 'flex', flexDirection: 'column', 
+        overflow: 'hidden', color: 'white', fontFamily: '"Inter", sans-serif' 
+    }}>
+      
+      {/* Header Premium */}
+      <header style={{ 
+          padding: '1rem 2rem', background: 'rgba(15, 23, 42, 0.8)', 
+          backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.05)',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', zíndex: 10
+      }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <div style={{ background: '#10b981', color: 'white', padding: '0.2rem 0.6rem', borderRadius: '2rem', fontSize: '0.65rem', fontWeight: 800 }}>AO VIVO</div>
-            <h2 style={{ margin: 0, fontSize: '1rem', color: 'white', fontWeight: 700 }}>Consulta Digital</h2>
+            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#f43f5e', animation: 'pulse 1.5s infinite' }} />
+            <span style={{ fontWeight: 800, fontSize: '1.1rem', letterSpacing: '-0.02em' }}>SESSÃO CLÍNICA ATIVA</span>
           </div>
-          <div style={{ height: '24px', width: '1px', background: 'rgba(255,255,255,0.1)' }} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#f43f5e', fontFamily: 'monospace', fontWeight: 800 }}>
-             <Clock size={16} /> {formatTime(consultationTime)}
+          <div style={{ height: '20px', width: '1px', background: 'rgba(255,255,255,0.1)' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#94a3b8', fontSize: '0.9rem' }}>
+            <Clock size={16} /> Duracão: <span style={{ color: 'white', fontWeight: 700, fontFamily: 'monospace' }}>{formatTime(consultationTime)}</span>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: '0.75rem' }}>
-           <button className="btn btn-outline btn-sm" style={{ color: 'white', borderColor: 'rgba(255,255,255,0.2)' }} onClick={() => navigate('/doctor/dashboard')}>Ver Painel</button>
-        </div>
-      </div>
 
-      {/* Grid Principal: Vídeo (Esquerda) e Prontuário (Direita) */}
-      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 420px' }}>
-        {/* Área de Vídeo */}
-        <div style={{ position: 'relative', background: '#000' }}>
-           <LiveKitVideo roomName={roomId || 'default'} userName={user?.name || 'Médico'} />
-        </div>
+        <button onClick={endConsultation} className="btn-end">
+          <Save size={18} /> FINALIZAR CONSULTA
+        </button>
+      </header>
 
-        {/* Área Lateral: Prontuário e Abas */}
-        <div style={{ background: 'white', display: 'flex', flexDirection: 'column', borderLeft: '1px solid #e2e8f0' }}>
-           {/* Seleção de Abas */}
-           <div style={{ display: 'flex', padding: '0.5rem', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', gap: '0.25rem' }}>
-              <TabBtn active={activeTab === 'evolucao'} onClick={()=>setActiveTab('evolucao')} icon={Edit3} label="Evolução" />
-              <TabBtn active={activeTab === 'receituario'} onClick={()=>setActiveTab('receituario')} icon={PenTool} label="Receita" />
-              <TabBtn active={activeTab === 'atestado'} onClick={()=>setActiveTab('atestado')} icon={FileText} label="Atestado" />
-           </div>
+      {/* Main Content Area */}
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '1.5rem', gap: '1.5rem', overflow: 'hidden' }}>
+        
+        {/* Top Row: Video & Patient Info */}
+        <div style={{ display: 'grid', gridTemplateColumns: '480px 1fr', gap: '1.5rem', height: '320px' }}>
+          
+          {/* Video Container */}
+          <div style={{ 
+              position: 'relative', background: '#000', borderRadius: '1.5rem', 
+              overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+              border: '1px solid rgba(255,255,255,0.05)'
+          }}>
+            <LiveKitVideo roomName={roomId || 'default'} userName={user?.name || 'Médico'} />
+            <div style={{ position: 'absolute', bottom: '1rem', left: '1rem', background: 'rgba(0,0,0,0.5)', padding: '0.4rem 0.8rem', borderRadius: '2rem', fontSize: '0.7rem', backdropFilter: 'blur(4px)' }}>
+               CONEXÃO ESTÁVEL P2P
+            </div>
+          </div>
 
-           {/* Conteúdo das Abas */}
-           <div style={{ flex: 1, padding: '1.5rem', overflowY: 'auto' }}>
-              {activeTab === 'evolucao' && (
-                <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                  <SectionHeader icon={Edit3} title="Evolução do Caso" desc="Anote aqui o quadro clínico e queixas." />
-                  <textarea className="form-control" style={{ flex: 1, resize: 'none', background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: '1rem', padding: '1rem' }} value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Digite aqui a evolução..." />
-                </div>
-              )}
-              {activeTab === 'receituario' && (
-                <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                  <SectionHeader icon={PenTool} title="Prescrição" desc="Medicamentos e dosagens." />
-                  <textarea className="form-control" style={{ flex: 1, resize: 'none', background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: '1rem', padding: '1rem', fontFamily: 'monospace' }} value={prescriptionContent} onChange={e=>setPrescriptionContent(e.target.value)} placeholder="Ex: Paracetamol 500mg..." />
-                </div>
-              )}
-              {activeTab === 'atestado' && (
-                <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                  <SectionHeader icon={FileText} title="Atestado Médico" desc="Emissão de afastamento." />
-                  <div style={{ background: '#f8fafc', padding: '1rem', borderRadius: '1rem', marginBottom: '1rem', border: '1px solid #f1f5f9', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                     <div><label style={{ fontSize: '0.65rem', fontWeight: 800 }}>DIAS</label><input type="number" className="form-control" value={daysOff} onChange={e=>setDaysOff(e.target.value)} /></div>
-                     <div><label style={{ fontSize: '0.65rem', fontWeight: 800 }}>CID</label><input type="text" className="form-control" value={cid} onChange={e=>setCid(e.target.value)} placeholder="Opcional" /></div>
+          {/* Patient Info Card */}
+          <div style={{ 
+              background: 'rgba(30, 41, 59, 0.5)', borderRadius: '1.5rem', 
+              padding: '2rem', border: '1px solid rgba(255,255,255,0.05)',
+              display: 'flex', flexDirection: 'column', justifyContent: 'center'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+               <div style={{ width: '80px', height: '80px', background: 'var(--accent)', borderRadius: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem' }}>
+                  <User size={40} color="white" />
+               </div>
+               <div>
+                  <h2 style={{ fontSize: '1.8rem', margin: 0, fontWeight: 800 }}>{patient?.name || 'Carregando...'}</h2>
+                  <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem', color: '#94a3b8', fontSize: '0.9rem' }}>
+                    <span>CPF: {patient?.cpf}</span>
+                    <span>•</span>
+                    <span>PACIENTE ID: {roomId?.substring(0,8)}</span>
                   </div>
-                  <textarea className="form-control" style={{ flex: 1, resize: 'none', background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: '1rem', padding: '1rem' }} value={atestadoContent} onChange={e=>setAtestadoContent(e.target.value)} placeholder="Conteúdo do atestado..." />
-                </div>
-              )}
-           </div>
-
-           {/* Botão de Finalização */}
-           <div style={{ padding: '1.5rem', background: '#f8fafc', borderTop: '1px solid #e2e8f0' }}>
-              <button className="btn btn-primary btn-full btn-lg" onClick={endConsultation} disabled={loading} style={{ borderRadius: '3rem', height: '56px', fontWeight: 800 }}>
-                 {loading ? 'SALVANDO...' : 'FINALIZAR ATENDIMENTO'}
-              </button>
-           </div>
+               </div>
+            </div>
+            
+            <div style={{ marginTop: '2rem', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem' }}>
+               <InfoItem label="IDADE" value="32 anos" />
+               <InfoItem label="SEXO" value="Masculino" />
+               <InfoItem label="TIPO SANGUÍNEO" value="O+" />
+            </div>
+          </div>
         </div>
-      </div>
+
+        {/* Bottom Row: Tabbed Records */}
+        <div style={{ 
+            flex: 1, background: 'white', borderRadius: '1.5rem 1.5rem 0 0', 
+            color: '#0f172a', display: 'flex', flexDirection: 'column', overflow: 'hidden'
+        }}>
+          {/* Custom Tabs Navigation */}
+          <div style={{ display: 'flex', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', padding: '0 1.5rem' }}>
+            <RecordTab active={activeTab === 'evolucao'} onClick={() => setActiveTab('evolucao')} icon={<Edit3 size={18}/>} label="EVOLUÇÃO CLÍNICA" />
+            <RecordTab active={activeTab === 'receituario'} onClick={() => setActiveTab('receituario')} icon={<PenTool size={18}/>} label="RECEITUÁRIO" />
+            <RecordTab active={activeTab === 'atestado'} onClick={() => setActiveTab('atestado')} icon={<FileText size={18}/>} label="ATESTADO MÉDICO" />
+            <RecordTab active={activeTab === 'exames'} onClick={() => setActiveTab('exames')} icon={<AlertCircle size={18}/>} label="EXAMES" />
+          </div>
+
+          {/* Tab Content Area */}
+          <div style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>
+             {activeTab === 'evolucao' && (
+                <div className="tab-content">
+                   <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', fontWeight: 800 }}>NOTAS DE EVOLUÇÃO</h3>
+                   <textarea 
+                     className="record-textarea" 
+                     placeholder="Descreva aqui o quadro clínico, anamnese e conduta..."
+                     value={notes}
+                     onChange={e => setNotes(e.target.value)}
+                   />
+                </div>
+             )}
+
+             {activeTab === 'receituario' && (
+                <div className="tab-content">
+                   <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', fontWeight: 800 }}>PRESCRIÇÃO DIGITAL</h3>
+                   <textarea 
+                     className="record-textarea" 
+                     style={{ fontFamily: 'monospace', color: '#2563eb' }}
+                     placeholder="1. Medicamento X - 500mg - 1x ao dia..."
+                     value={prescriptionContent}
+                     onChange={e => setPrescriptionContent(e.target.value)}
+                   />
+                </div>
+             )}
+
+             {activeTab === 'atestado' && (
+                <div className="tab-content">
+                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                      <h3 style={{ fontSize: '1.1rem', margin: 0, fontWeight: 800 }}>ATESTADO MÉDICO</h3>
+                      <div style={{ display: 'flex', gap: '1rem' }}>
+                         <div className="input-group">
+                            <label>DIAS DE AFASTAMENTO</label>
+                            <input type="number" value={daysOff} onChange={e => setDaysOff(e.target.value)} />
+                         </div>
+                         <div className="input-group">
+                            <label>CID (OPCIONAL)</label>
+                            <input type="text" value={cid} onChange={e => setCid(e.target.value)} placeholder="Ex: Z00" />
+                         </div>
+                      </div>
+                   </div>
+                   <textarea 
+                     className="record-textarea" 
+                     placeholder="O paciente deve permanecer em repouso por..."
+                     value={atestadoContent}
+                     onChange={e => setAtestadoContent(e.target.value)}
+                   />
+                </div>
+             )}
+          </div>
+        </div>
+      </main>
+
+      <style>{`
+        @keyframes pulse {
+          0% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.5; transform: scale(1.2); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+        .btn-end {
+           background: #f43f5e; color: white; border: none; padding: 0.75rem 1.5rem;
+           border-radius: 0.75rem; font-weight: 800; cursor: pointer; display: flex;
+           align-items: center; gap: 0.5rem; transition: all 0.2s;
+        }
+        .btn-end:hover { background: #e11d48; transform: translateY(-2px); }
+        
+        .record-textarea {
+           width: 100%; height: 300px; border: none; background: #f8fafc;
+           border-radius: 1rem; padding: 1.5rem; font-size: '1rem'; line-height: 1.6;
+           color: #1e293b; resize: none; outline: none; transition: all 0.2s;
+           border: 1px solid #e2e8f0;
+        }
+        .record-textarea:focus { background: white; border-color: var(--accent); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); }
+
+        .input-group label { display: block; font-size: 0.6rem; font-weight: 900; color: #94a3b8; margin-bottom: 0.3rem; }
+        .input-group input { 
+            padding: 0.5rem; border-radius: 0.5rem; border: 1px solid #e2e8f0; 
+            font-weight: 700; width: 100px; outline: none;
+        }
+      `}</style>
     </div>
   );
 };
 
-// Componente de botão de aba
-const TabBtn = ({ active, onClick, icon: Icon, label }: any) => (
-  <button onClick={onClick} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', padding: '0.75rem', borderRadius: '0.75rem', border: 'none', background: active ? 'white' : 'transparent', color: active ? '#6366f1' : '#64748b', fontSize: '0.75rem', fontWeight: active ? 700 : 500, transition: 'all 0.2s', boxShadow: active ? '0 4px 6px -1px rgba(0,0,0,0.05)' : 'none' }}>
-    <Icon size={14} /> {label}
+const InfoItem = ({ label, value }: any) => (
+  <div>
+    <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#94a3b8', letterSpacing: '0.05em', marginBottom: '0.2rem' }}>{label}</div>
+    <div style={{ fontWeight: 700 }}>{value}</div>
+  </div>
+);
+
+const RecordTab = ({ active, onClick, icon, label }: any) => (
+  <button 
+    onClick={onClick}
+    style={{ 
+      padding: '1.25rem 1.5rem', border: 'none', background: 'none',
+      color: active ? 'var(--accent)' : '#64748b',
+      fontWeight: 800, fontSize: '0.75rem', cursor: 'pointer',
+      display: 'flex', alignItems: 'center', gap: '0.6rem',
+      borderBottom: `3px solid ${active ? 'var(--accent)' : 'transparent'}`,
+      transition: 'all 0.2s'
+    }}
+  >
+    {icon} {label}
   </button>
 );
 

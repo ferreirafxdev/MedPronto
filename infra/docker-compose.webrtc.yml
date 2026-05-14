@@ -1,0 +1,45 @@
+version: '3.9'
+
+services:
+  # LiveKit Server - O coração do WebRTC
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: livekit-server
+    restart: always
+    command: --config /etc/livekit.yaml
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml
+    ports:
+      - "7880:7880" # HTTP/WebSocket Signal
+      - "7881:7881" # TCP/MDTN
+      - "50000-60000:50000-60000/udp" # WebRTC UDP Range
+    environment:
+      - LIVEKIT_KEYS_API_KEY=devkey
+      - LIVEKIT_KEYS_API_SECRET=secret
+    networks:
+      - webrtc-net
+
+  # Coturn - Servidor TURN para transposição de NAT
+  coturn:
+    image: coturn/coturn:latest
+    container_name: coturn-server
+    restart: always
+    ports:
+      - "3478:3478" # STUN/TURN
+      - "3478:3478/udp"
+    volumes:
+      - ./turnserver.conf:/etc/coturn/turnserver.conf
+    networks:
+      - webrtc-net
+
+  # Redis - Necessário para escalabilidade do LiveKit
+  redis:
+    image: redis:7-alpine
+    container_name: livekit-redis
+    command: redis-server --save 60 1 --loglevel warning
+    networks:
+      - webrtc-net
+
+networks:
+  webrtc-net:
+    driver: bridge

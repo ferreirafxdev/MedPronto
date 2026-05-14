@@ -31,7 +31,17 @@ const allowedOrigins = [
 ];
 
 app.use(helmet({ contentSecurityPolicy: false })); // Proteção de headers HTTP
-app.use(cors({ origin: allowedOrigins, credentials: true })); // Controle de acesso
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'production' 
+    ? [process.env.FRONTEND_URL || ''] 
+    : true, // No dev, permite tudo para facilitar
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
+app.use(cors(corsOptions));
+ // Controle de acesso
 app.set('trust proxy', 1); // Necessário para rate limiting atrás de proxies como Vercel/Cloudflare
 app.use(express.json()); // Parser para JSON no corpo das requisições
 
