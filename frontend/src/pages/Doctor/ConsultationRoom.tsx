@@ -6,7 +6,7 @@ import {
   Edit3, PenTool, FileText, Clock, User, 
   ChevronRight, Save, Info, AlertCircle 
 } from 'lucide-react';
-import LiveKitVideo from '../../components/LiveKitVideo';
+import DailyVideo from '../../components/DailyVideo';
 
 /**
  * Sala de Consulta Profissional
@@ -21,6 +21,7 @@ const ConsultationRoom = () => {
   const [loading, setLoading] = useState(false);
   const [consultationTime, setConsultationTime] = useState(0);
   const [patient, setPatient] = useState<any>(null);
+  const [dailyConfig, setDailyConfig] = useState<{url: string, token: string} | null>(null);
 
   // Estados dos documentos
   const [notes, setNotes] = useState('');
@@ -33,8 +34,22 @@ const ConsultationRoom = () => {
   useEffect(() => { 
     const t = setInterval(() => setConsultationTime(p => p + 1), 1000); 
     fetchPatientData();
+    fetchDailyToken();
     return () => clearInterval(t); 
   }, []);
+
+  const fetchDailyToken = async () => {
+    try {
+      const res = await apiClient.post('/api/daily/token', {
+        room: roomId,
+        username: user?.name || 'Médico',
+        isDoctor: true
+      });
+      setDailyConfig({ url: res.data.url, token: res.data.token });
+    } catch (err) {
+      console.error("Erro ao obter token do Daily.co", err);
+    }
+  };
 
   const fetchPatientData = async () => {
     try {
@@ -78,7 +93,7 @@ const ConsultationRoom = () => {
       <header style={{ 
           padding: '1rem 2rem', background: 'rgba(15, 23, 42, 0.8)', 
           backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.05)',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center', zíndex: 10
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 10
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
@@ -87,7 +102,7 @@ const ConsultationRoom = () => {
           </div>
           <div style={{ height: '20px', width: '1px', background: 'rgba(255,255,255,0.1)' }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#94a3b8', fontSize: '0.9rem' }}>
-            <Clock size={16} /> Duracão: <span style={{ color: 'white', fontWeight: 700, fontFamily: 'monospace' }}>{formatTime(consultationTime)}</span>
+            <Clock size={16} /> Duração: <span style={{ color: 'white', fontWeight: 700, fontFamily: 'monospace' }}>{formatTime(consultationTime)}</span>
           </div>
         </div>
 
@@ -108,8 +123,12 @@ const ConsultationRoom = () => {
               overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
               border: '1px solid rgba(255,255,255,0.05)'
           }}>
-            <LiveKitVideo roomName={roomId || 'default'} userName={user?.name || 'Médico'} />
-            <div style={{ position: 'absolute', bottom: '1rem', left: '1rem', background: 'rgba(0,0,0,0.5)', padding: '0.4rem 0.8rem', borderRadius: '2rem', fontSize: '0.7rem', backdropFilter: 'blur(4px)' }}>
+             {dailyConfig ? (
+                 <DailyVideo roomUrl={dailyConfig.url} token={dailyConfig.token} />
+             ) : (
+                 <div style={{ color: 'white', display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center' }}>Inicializando sala segura (Daily.co)...</div>
+             )}
+            <div style={{ position: 'absolute', bottom: '1rem', left: '1rem', background: 'rgba(0,0,0,0.5)', padding: '0.4rem 0.8rem', borderRadius: '2rem', fontSize: '0.7rem', backdropFilter: 'blur(4px)', zIndex: 50, pointerEvents: 'none' }}>
                CONEXÃO ESTÁVEL P2P
             </div>
           </div>

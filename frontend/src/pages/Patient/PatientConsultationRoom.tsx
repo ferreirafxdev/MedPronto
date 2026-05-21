@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import apiClient from '../../api/client';
-import { PhoneOff, ShieldCheck, HeartPulse } from 'lucide-react';
-import LiveKitVideo from '../../components/LiveKitVideo';
+import { ShieldCheck, HeartPulse } from 'lucide-react';
+import DailyVideo from '../../components/DailyVideo';
 import { useStore } from '../../store/useStore';
 
 /**
@@ -14,6 +14,27 @@ const PatientConsultationRoom = () => {
   const { user } = useStore();
   const navigate = useNavigate();
   const [status, setStatus] = useState<'active' | 'ended'>('active');
+  const [dailyConfig, setDailyConfig] = useState<{url: string, token: string} | null>(null);
+
+  useEffect(() => {
+    // Busca as credenciais do Daily.co
+    const fetchDailyToken = async () => {
+      try {
+        const res = await apiClient.post('/api/daily/token', {
+          room: roomId,
+          username: user?.name || 'Paciente',
+          isDoctor: false
+        });
+        setDailyConfig({ url: res.data.url, token: res.data.token });
+      } catch (err) {
+        console.error("Erro ao obter token do Daily.co", err);
+      }
+    };
+    
+    if (user && roomId) {
+       fetchDailyToken();
+    }
+  }, [roomId, user]);
 
   useEffect(() => {
     // Monitora se a consulta foi finalizada pelo médico no banco de dados
@@ -71,9 +92,13 @@ const PatientConsultationRoom = () => {
         overflow: 'hidden', fontFamily: '"Inter", sans-serif' 
     }}>
       
-      {/* Componente de Vídeo LiveKit */}
+      {/* Componente de Vídeo Daily.co */}
       <div style={{ width: '100%', height: '100%' }}>
-         <LiveKitVideo roomName={roomId || 'default'} userName={user?.name || 'Paciente'} />
+         {dailyConfig ? (
+             <DailyVideo roomUrl={dailyConfig.url} token={dailyConfig.token} />
+         ) : (
+             <div style={{ color: 'white', display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center' }}>Carregando sala de vídeo...</div>
+         )}
       </div>
       
       {/* Overlay de Segurança e Branding */}

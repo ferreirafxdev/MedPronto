@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { supabase } from '../utils/supabase';
-import { getLiveKitToken } from '../controllers/livekit.controller';
+import { getDailyRoomAndToken } from '../controllers/daily.controller';
 
 const router = Router();
 
@@ -31,6 +31,6 @@ router.post('/payment/confirm', async (req, res) => {
   res.json({ success: true, message: 'Pagamento confirmado e registrado no banco.' });
 });
 
-router.get('/livekit/token', getLiveKitToken);
+router.post('/daily/token', getDailyRoomAndToken); // Usando POST pois enviamos isDoctor no body
 
 export default router;
