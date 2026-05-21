@@ -33,7 +33,19 @@ const allowedOrigins = [
 app.use(helmet({ contentSecurityPolicy: false })); // Proteção de headers HTTP
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
-    ? [process.env.FRONTEND_URL || ''] 
+    ? (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+        // Permite requisições sem origin (ex: mobile apps, curl)
+        if (!origin) return callback(null, true);
+        const isAllowed = allowedOrigins.some(o => 
+          o instanceof RegExp ? o.test(origin) : o === origin
+        );
+        // Também permite se FRONTEND_URL estiver configurada
+        if (isAllowed || origin === process.env.FRONTEND_URL) {
+          callback(null, true);
+        } else {
+          callback(new Error('Bloqueado pelo CORS'));
+        }
+      }
     : true, // No dev, permite tudo para facilitar
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],

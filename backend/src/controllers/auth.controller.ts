@@ -11,10 +11,15 @@ import { supabase } from '../utils/supabase';
 export const patientAuth = async (req: Request, res: Response) => {
   try {
     const { cpf, birthDate } = req.body;
+    
+    // Normaliza o CPF removendo máscara para busca robusta
+    const cpfClean = cpf.replace(/\D/g, '');
+    const cpfFormatted = cpfClean.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+    
     const { data: patient, error } = await supabase
       .from('patients')
       .select('*')
-      .eq('cpf', cpf)
+      .or(`cpf.eq.${cpfClean},cpf.eq.${cpfFormatted}`)
       .eq('birth_date', birthDate)
       .single();
 
