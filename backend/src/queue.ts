@@ -14,6 +14,15 @@ export const patientQueue = new Queue('patient-queue', { connection });
 export const documentQueue = new Queue('document-queue', { connection });
 
 async function generatePDFBuffer(type: string, data: any): Promise<Buffer> {
+  // Busca informações do paciente e do médico no Supabase para inclusão dinâmica
+  const [patientRes, doctorRes] = await Promise.all([
+    supabase.from('patients').select('name').eq('id', data.patientId).maybeSingle(),
+    supabase.from('doctors').select('name, crm').eq('id', data.doctorId).maybeSingle()
+  ]);
+  const patientName = patientRes.data?.name || 'Paciente';
+  const doctorName = doctorRes.data?.name || 'Médico';
+  const doctorCRM = doctorRes.data?.crm || 'CRM-SP 00000';
+
   return new Promise((resolve, reject) => {
     try {
       const template = new PDFTemplate();
@@ -26,18 +35,19 @@ async function generatePDFBuffer(type: string, data: any): Promise<Buffer> {
 
       if (type === 'GENERATE_ATESTADO') {
         template.drawLayout('Atestado Médico');
+        template.addSection('Paciente', patientName);
         template.addContent(data.content);
         template.addSection('Período de Afastamento', `${data.daysOff} dias`);
         if (data.cid) template.addSection('CID', data.cid);
       } else {
-        template.drawLayout('Prontuário Médico & Prescrições');
-        template.addSection('Notas da Consulta', data.notes);
+        template.drawLayout('Receituário & Evolução');
+        template.addSection('Paciente', patientName);
+        template.addSection('Evolução Clínica', data.notes);
         template.addSection('Prescrições', data.prescriptions);
         if (data.exams) template.addSection('Exames Solicitados', data.exams);
       }
 
-      // Fetch doctor info for footer (simplified for now)
-      template.finalizeWithFooter('MedPronto Digital', 'CRM-SP 00000', data.validationCode);
+      template.finalizeWithFooter(doctorName, doctorCRM, data.validationCode);
     } catch (err) {
       reject(err);
     }

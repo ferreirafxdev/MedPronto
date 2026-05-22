@@ -16,21 +16,22 @@ const DoctorLogin = () => {
         const formData = new FormData(e.target as HTMLFormElement);
         const login = formData.get('login');
         const password = formData.get('password');
+        const loginStr = String(login || '').trim();
         
-        // Try Doctor Login
-        try {
-            const resp = await apiClient.post('/api/doctor/auth', { login, password });
-            if (resp.data.success) {
-                setUser({ id: resp.data.doctor.id, name: resp.data.doctor.name, role: 'doctor', token: resp.data.token });
-                navigate('/doctor/dashboard');
-                return;
-            }
-        } catch (doctorErr) {
-            // If doctor login fails, try Admin Login
+        if (loginStr === 'admin@medpronto.com') {
+            // Login Direto do Administrador
             const respAdmin = await apiClient.post('/api/admin/auth', { login, password });
             if (respAdmin.data.success) {
                 setUser({ id: respAdmin.data.admin.id, name: respAdmin.data.admin.name, role: 'admin', token: respAdmin.data.token });
                 navigate('/admin/dashboard');
+                return;
+            }
+        } else {
+            // Login Direto do Médico
+            const resp = await apiClient.post('/api/doctor/auth', { login, password });
+            if (resp.data.success) {
+                setUser({ id: resp.data.doctor.id, name: resp.data.doctor.name, role: 'doctor', token: resp.data.token });
+                navigate('/doctor/dashboard');
                 return;
             }
         }

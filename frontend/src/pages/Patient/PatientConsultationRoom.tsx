@@ -15,6 +15,7 @@ const PatientConsultationRoom = () => {
   const navigate = useNavigate();
   const [status, setStatus] = useState<'active' | 'ended'>('active');
   const [dailyConfig, setDailyConfig] = useState<{url: string, token: string} | null>(null);
+  const [doctorName, setDoctorName] = useState('Médico');
 
   useEffect(() => {
     // Busca as credenciais do Daily.co
@@ -31,8 +32,18 @@ const PatientConsultationRoom = () => {
       }
     };
     
+    const fetchInitialDoctorName = async () => {
+      try {
+        const r = await apiClient.get(`/api/patient/check-queue/${user?.id}`);
+        if (r.data.isActive && r.data.doctorName) {
+          setDoctorName(r.data.doctorName);
+        }
+      } catch (e) { /* ignore */ }
+    };
+    
     if (user && roomId) {
        fetchDailyToken();
+       fetchInitialDoctorName();
     }
   }, [roomId, user]);
 
@@ -46,6 +57,8 @@ const PatientConsultationRoom = () => {
           setStatus('ended');
           clearInterval(interval);
           setTimeout(() => navigate('/patient/dashboard'), 4000);
+        } else if (r.data.doctorName) {
+          setDoctorName(r.data.doctorName);
         }
       } catch (e) { /* ignore */ }
     }, 5000);
@@ -118,7 +131,7 @@ const PatientConsultationRoom = () => {
          </div>
          <div>
             <div style={{ color: 'white', fontSize: '0.85rem', fontWeight: 800 }}>CONSULTA SEGURA</div>
-            <div style={{ color: '#10b981', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em' }}>CRIPTOGRAFIA PONTA-A-PONTA</div>
+            <div style={{ color: '#10b981', fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.05em' }}>Dr(a). {doctorName}</div>
          </div>
       </div>
 

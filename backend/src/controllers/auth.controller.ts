@@ -21,7 +21,7 @@ export const patientAuth = async (req: Request, res: Response) => {
       .select('*')
       .or(`cpf.eq.${cpfClean},cpf.eq.${cpfFormatted}`)
       .eq('birth_date', birthDate)
-      .single();
+      .maybeSingle();
 
     if (error || !patient) return res.status(401).json({ error: 'Paciente não encontrado ou dados incorretos.' });
 
@@ -46,12 +46,21 @@ export const doctorAuth = async (req: Request, res: Response) => {
   try {
     const { login, password } = req.body;
     
-    // Busca o médico por qualquer um dos identificadores
-    const { data: doctor, error } = await supabase
-      .from('doctors')
-      .select('*')
-      .or(`crm.eq.${login},email.eq.${login},cpf.eq.${login}`)
-      .single();
+    // Busca inteligente para evitar erros de sintaxe PostgREST e otimizar velocidade
+    let query = supabase.from('doctors').select('*');
+    if (login.includes('@')) {
+      query = query.eq('email', login);
+    } else {
+      const cleanLogin = login.replace(/\D/g, '');
+      if (cleanLogin.length === 11) {
+        const cpfFormatted = cleanLogin.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+        query = query.or(`cpf.eq.${cleanLogin},cpf.eq.${cpfFormatted}`);
+      } else {
+        query = query.eq('crm', login);
+      }
+    }
+
+    const { data: doctor, error } = await query.maybeSingle();
 
     if (error || !doctor || !doctor.password) return res.status(401).json({ error: 'Médico não encontrado.' });
 

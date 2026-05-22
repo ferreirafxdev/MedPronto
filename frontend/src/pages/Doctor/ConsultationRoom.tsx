@@ -98,7 +98,7 @@ const ConsultationRoom = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#f43f5e', animation: 'pulse 1.5s infinite' }} />
-            <span style={{ fontWeight: 800, fontSize: '1.1rem', letterSpacing: '-0.02em' }}>SESSÃO CLÍNICA ATIVA</span>
+            <span style={{ fontWeight: 800, fontSize: '1.1rem', letterSpacing: '-0.02em' }}>SESSÃO CLÍNICA ATIVA | Dr(a). {user?.name}</span>
           </div>
           <div style={{ height: '20px', width: '1px', background: 'rgba(255,255,255,0.1)' }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#94a3b8', fontSize: '0.9rem' }}>

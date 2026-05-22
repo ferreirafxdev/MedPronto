@@ -110,7 +110,13 @@ export const checkQueueStatus = async (req: Request, res: Response) => {
 
     // Se estiver em atendimento
     if (activeRes.data) {
-      return res.json({ isActive: true, inQueue: false, roomId: patientId });
+      const doctorId = activeRes.data.doctor_id;
+      let doctorName = 'Médico';
+      if (doctorId) {
+        const { data: doc } = await supabase.from('doctors').select('name').eq('id', doctorId).maybeSingle();
+        if (doc) doctorName = doc.name;
+      }
+      return res.json({ isActive: true, inQueue: false, roomId: patientId, doctorName });
     }
     
     // Se estiver apenas aguardando
