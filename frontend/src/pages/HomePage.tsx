@@ -542,7 +542,7 @@ const HomePage = () => {
 
       {/* Rodapé da Página */}
       <footer style={{ padding: '4rem 2rem', borderTop: '1px solid var(--border)', background: 'white' }}>
-         <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', flexDirection: 'column', mdFlexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: '2rem' }} className="flex flex-col md:flex-row justify-between items-center">
+         <div style={{ maxWidth: '1200px', margin: '0 auto', justifyContent: 'space-between', alignItems: 'center', gap: '2rem' }} className="flex flex-col md:flex-row justify-between items-center">
             <div className="logo-text">
                 <span className="med">Med</span><span className="pronto">Pronto</span>
             </div>
