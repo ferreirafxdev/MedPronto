@@ -26,27 +26,36 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://127.0.0.1:5173',
   'https://med-pronto-wph4.vercel.app',
-  'https://medpronto-online.vercel.app',
-  /\.vercel\.app$/ // Permite subdomínios da Vercel
+  'https://medpronto-online.vercel.app'
 ];
+
+const isOriginAllowed = (origin: string): boolean => {
+  const cleanOrigin = origin.replace(/\/$/, ''); // Remove barra no final se houver
+  
+  // Verifica correspondência exata
+  if (allowedOrigins.includes(cleanOrigin)) return true;
+  
+  // Verifica subdomínios da Vercel
+  if (/\.vercel\.app$/.test(cleanOrigin)) return true;
+  
+  // Verifica Localhost e portas dinâmicas
+  if (/^http:\/\/localhost(:\d+)?$/.test(cleanOrigin) || /^http:\/\/127\.0\.0\.1(:\d+)?$/.test(cleanOrigin)) return true;
+  
+  return false;
+};
 
 app.use(helmet({ contentSecurityPolicy: false })); // Proteção de headers HTTP
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-        // Permite requisições sem origin (ex: mobile apps, curl)
-        if (!origin) return callback(null, true);
-        const isAllowed = allowedOrigins.some(o => 
-          o instanceof RegExp ? o.test(origin) : o === origin
-        );
-        // Também permite se FRONTEND_URL estiver configurada
-        if (isAllowed || origin === process.env.FRONTEND_URL) {
-          callback(null, true);
-        } else {
-          callback(new Error('Bloqueado pelo CORS'));
-        }
-      }
-    : true, // No dev, permite tudo para facilitar
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    // Permite requisições sem origin (ex: mobile apps, curl)
+    if (!origin) return callback(null, true);
+    
+    if (isOriginAllowed(origin) || origin === process.env.FRONTEND_URL) {
+      callback(null, true);
+    } else {
+      callback(null, false); // Rejeita CORS sem lançar erros 500 no Express
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
