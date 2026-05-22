@@ -12,18 +12,42 @@ export const patientAuth = async (req: Request, res: Response) => {
   try {
     const { cpf, birthDate } = req.body;
     
-    // Normaliza o CPF removendo máscara para busca robusta
+    if (!cpf || !birthDate) {
+      return res.status(400).json({ error: 'CPF e data de nascimento são obrigatórios.' });
+    }
+
+    // Normaliza o CPF removendo máscara para busca robusta via índice
     const cpfClean = cpf.replace(/\D/g, '');
     const cpfFormatted = cpfClean.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
     
+    // Busca direta por CPF único (extremamente rápida)
     const { data: patient, error } = await supabase
       .from('patients')
       .select('*')
       .or(`cpf.eq.${cpfClean},cpf.eq.${cpfFormatted}`)
-      .eq('birth_date', birthDate)
       .maybeSingle();
 
-    if (error || !patient) return res.status(401).json({ error: 'Paciente não encontrado ou dados incorretos.' });
+    if (error || !patient) {
+      return res.status(401).json({ error: 'Paciente não encontrado com o CPF informado.' });
+    }
+
+    // Comparação de data de nascimento ultra-robusta e agnóstica a formato (limpa / e -)
+    const cleanInputDate = birthDate.replace(/[-\/]/g, '');
+    const cleanDbDate = patient.birth_date ? patient.birth_date.replace(/[-\/]/g, '') : '';
+
+    // Normaliza datas em formato brasileiro (DDMMYYYY) ou americano (YYYYMMDD) para padrão comparativo US
+    const toStandardUS = (dateStr: string) => {
+      if (/^(19|20)\d{6}$/.test(dateStr)) return dateStr; // Já é YYYYMMDD
+      if (/^\d{8}$/.test(dateStr)) {
+        // DDMMYYYY -> YYYYMMDD
+        return dateStr.slice(4) + dateStr.slice(2, 4) + dateStr.slice(0, 2);
+      }
+      return dateStr;
+    };
+
+    if (toStandardUS(cleanInputDate) !== toStandardUS(cleanDbDate)) {
+      return res.status(401).json({ error: 'Data de nascimento incorreta para o CPF informado.' });
+    }
 
     // Gera token JWT válido por 24 horas
     const token = jwt.sign(
