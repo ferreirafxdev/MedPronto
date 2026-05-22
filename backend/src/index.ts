@@ -24,11 +24,7 @@ const app = express();
 // -- Middleware de Segurança e CORS --
 app.use(helmet({ contentSecurityPolicy: false })); // Proteção de headers HTTP
 const corsOptions = {
-  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    // Permite qualquer origem dinamicamente (refletindo-a) para suportar credentials: true
-    // e evitar falhas de CORS em qualquer ambiente de desenvolvimento ou produção.
-    callback(null, true);
-  },
+  origin: true, // Reflete a origem de quem está chamando (para suportar credentials em multi-domínios)
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With']
