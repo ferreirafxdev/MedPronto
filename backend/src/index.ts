@@ -29,36 +29,16 @@ const allowedOrigins = [
   'https://medpronto-online.vercel.app'
 ];
 
-const isOriginAllowed = (origin: string): boolean => {
-  const cleanOrigin = origin.replace(/\/$/, ''); // Remove barra no final se houver
-  
-  // Verifica correspondência exata
-  if (allowedOrigins.includes(cleanOrigin)) return true;
-  
-  // Verifica subdomínios da Vercel
-  if (/\.vercel\.app$/.test(cleanOrigin)) return true;
-  
-  // Verifica Localhost e portas dinâmicas
-  if (/^http:\/\/localhost(:\d+)?$/.test(cleanOrigin) || /^http:\/\/127\.0\.0\.1(:\d+)?$/.test(cleanOrigin)) return true;
-  
-  return false;
-};
-
 app.use(helmet({ contentSecurityPolicy: false })); // Proteção de headers HTTP
 const corsOptions = {
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    // Permite requisições sem origin (ex: mobile apps, curl)
-    if (!origin) return callback(null, true);
-    
-    if (isOriginAllowed(origin) || origin === process.env.FRONTEND_URL) {
-      callback(null, true);
-    } else {
-      callback(null, false); // Rejeita CORS sem lançar erros 500 no Express
-    }
+    // Permite qualquer origem dinamicamente (refletindo-a) para suportar credentials: true
+    // e evitar falhas de CORS em qualquer ambiente de desenvolvimento ou produção.
+    callback(null, true);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With']
 };
 
 app.use(cors(corsOptions));
