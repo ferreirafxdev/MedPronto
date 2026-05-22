@@ -154,9 +154,9 @@ const ConsultationRoom = () => {
             </div>
             
             <div style={{ marginTop: '2rem', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem' }}>
-               <InfoItem label="IDADE" value="32 anos" />
-               <InfoItem label="SEXO" value="Masculino" />
-               <InfoItem label="TIPO SANGUÍNEO" value="O+" />
+               <InfoItem label="IDADE" value={patient?.age ? `${patient.age} anos` : '--'} />
+               <InfoItem label="SEXO" value="Não Informado" />
+               <InfoItem label="TIPO SANGUÍNEO" value="Não Informado" />
             </div>
           </div>
         </div>
@@ -224,6 +224,18 @@ const ConsultationRoom = () => {
                    />
                 </div>
              )}
+
+             {activeTab === 'exames' && (
+                <div className="tab-content">
+                   <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', fontWeight: 800 }}>PEDIDO DE EXAMES</h3>
+                   <textarea 
+                     className="record-textarea" 
+                     placeholder="Descreva os exames solicitados..."
+                     value={exams}
+                     onChange={e => setExams(e.target.value)}
+                   />
+                </div>
+             )}
           </div>
         </div>
       </main>
@@ -243,7 +255,7 @@ const ConsultationRoom = () => {
         
         .record-textarea {
            width: 100%; height: 300px; border: none; background: #f8fafc;
-           border-radius: 1rem; padding: 1.5rem; font-size: '1rem'; line-height: 1.6;
+           border-radius: 1rem; padding: 1.5rem; font-size: 1rem; line-height: 1.6;
            color: #1e293b; resize: none; outline: none; transition: all 0.2s;
            border: 1px solid #e2e8f0;
         }

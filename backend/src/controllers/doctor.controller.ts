@@ -118,14 +118,47 @@ export const validateDocument = async (req: Request, res: Response) => {
     const { code } = req.params;
     const cleanCode = (code as string).trim().toUpperCase();
 
-    // Busca em ambas as tabelas pelo código único
+    // Busca em ambas as tabelas pelo código único com joins para pegar dados do paciente e médico
     const [atestadoRes, consultationRes] = await Promise.all([
-      supabase.from('atestados').select('*').eq('code', cleanCode).maybeSingle(),
-      supabase.from('consultations').select('*').eq('validation_code', cleanCode).maybeSingle()
+      supabase.from('atestados')
+        .select('*, patient:patients(name), doctor:doctors(name, crm)')
+        .eq('code', cleanCode)
+        .maybeSingle(),
+      supabase.from('consultations')
+        .select('*, patient:patients(name), doctor:doctors(name, crm)')
+        .eq('validation_code', cleanCode)
+        .maybeSingle()
     ]);
 
-    if (atestadoRes.data) return res.json({ success: true, type: 'ATESTADO', document: atestadoRes.data });
-    if (consultationRes.data) return res.json({ success: true, type: 'RECEITA', document: consultationRes.data });
+    if (atestadoRes.data) {
+      const doc = atestadoRes.data;
+      return res.json({ 
+        success: true, 
+        type: 'ATESTADO', 
+        document: {
+          patientName: doc.patient?.name || doc.patient_name,
+          doctorName: doc.doctor?.name || doc.doctor_name,
+          doctorCrm: doc.doctor?.crm || doc.doctor_crm,
+          date: doc.created_at,
+          details: doc.content || `Afastamento de ${doc.days_off} dias. CID: ${doc.cid || 'Não informado'}`
+        }
+      });
+    }
+
+    if (consultationRes.data) {
+      const doc = consultationRes.data;
+      return res.json({ 
+        success: true, 
+        type: 'RECEITA', 
+        document: {
+          patientName: doc.patient?.name,
+          doctorName: doc.doctor?.name,
+          doctorCrm: doc.doctor?.crm,
+          date: doc.created_at,
+          details: `Prescrições: ${doc.prescriptions || 'Nenhuma'}\nExames: ${doc.exams || 'Nenhum'}`
+        }
+      });
+    }
 
     res.status(404).json({ error: 'Não encontrado' });
   } catch (err: any) {

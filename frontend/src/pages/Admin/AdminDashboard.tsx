@@ -290,7 +290,7 @@ Médico: ${a.doctor_name}
                   style={{ paddingLeft: '3rem', height: '48px', borderRadius: '1rem' }}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && fetchData()}
+                  onKeyDown={(e) => e.key === 'Enter' && fetchData()}
                 />
              </div>
 

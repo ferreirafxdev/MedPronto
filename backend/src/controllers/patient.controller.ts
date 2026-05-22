@@ -98,9 +98,13 @@ export const getPatientHistory = async (req: any, res: Response) => {
 /**
  * Verifica se o paciente está na fila ou em atendimento ativo
  */
-export const checkQueueStatus = async (req: Request, res: Response) => {
+export const checkQueueStatus = async (req: any, res: Response) => {
   try {
     const { patientId } = req.params;
+
+    if (req.user.role === 'patient' && req.user.id !== patientId) {
+      return res.status(403).json({ error: 'Acesso negado. Você só pode consultar o próprio status.' });
+    }
     
     // Verifica em paralelo se está na fila de espera ou em atendimento
     const [waitingRes, activeRes] = await Promise.all([

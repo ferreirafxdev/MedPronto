@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { createDailyRoom, createDailyToken } from '../services/daily.service';
+import { config } from '../config';
 
 /**
  * Endpoint unificado para gerar a URL da sala e o Token de acesso no Daily.co
@@ -29,8 +30,7 @@ export const getDailyRoomAndToken = async (req: Request, res: Response) => {
 
     // A URL padrão de salas do Daily.co criadas pela API é https://<seu-dominio>.daily.co/<nome-da-sala>
     // Precisamos pegar isso do env ou compor com a API key que está no workspace.
-    // Como estamos apenas configurando para uso na URL customizada do prebuilt:
-    const domain = "ferreirafxdev"; // Domínio associado à API KEY do daily.co. Idealmente colocar no .env
+    const domain = config.dailyDomain; 
     const url = `https://${domain}.daily.co/${roomName}`;
 
     // 2. Gera o token seguro (Dono se isDoctor = true)

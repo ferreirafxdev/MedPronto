@@ -1,6 +1,7 @@
 import axios from 'axios';
+import { config } from '../config';
 
-const DAILY_API_KEY = process.env.DAILY_API_KEY || "2737dddf94a68f2315662645f4bcb35d913ca32cc6ec5d8f5585e49909c9cd8f";
+const DAILY_API_KEY = config.dailyApiKey;
 const DAILY_API_URL = 'https://api.daily.co/v1/rooms';
 
 export const createDailyRoom = async (consultationId: string) => {

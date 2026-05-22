@@ -8,6 +8,6 @@ const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20 });
 
 router.post('/register', authLimiter, patientController.registerPatient);
 router.get('/history/:cpf', authenticateToken, patientController.getPatientHistory);
-router.get('/check-queue/:patientId', patientController.checkQueueStatus);
+router.get('/check-queue/:patientId', authenticateToken, patientController.checkQueueStatus);
 
 export default router;
