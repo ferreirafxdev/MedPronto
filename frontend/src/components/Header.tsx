@@ -32,7 +32,7 @@ const Header = () => {
   return (
     <header className={`header ${isScrolled ? 'header-scrolled' : ''}`}>
       <div className="header-container">
-        <Link to="/" className="logo-link" onClick={() => setMobileMenuOpen(false)}>
+        <Link to="/" className="logo-link focus-ring" aria-label="Ir para a página inicial MedPronto" onClick={() => setMobileMenuOpen(false)}>
           <div className="logo-icon">
             <Heart size={18} color="white" fill="white" strokeWidth={0} />
           </div>
@@ -43,7 +43,7 @@ const Header = () => {
         </Link>
 
         {/* Desktop Nav */}
-        <nav className="desktop-nav">
+        <nav className="desktop-nav" aria-label="Navegação principal">
           <NavLink to="/" active={isActive('/')} icon={<Home size={15} />} label="Início" />
 
           {!user && (
@@ -66,7 +66,7 @@ const Header = () => {
                 <div className="user-name">{user.name}</div>
                 <div className="user-role">{user.role}</div>
               </div>
-              <button onClick={handleLogout} className="btn-logout">
+              <button onClick={handleLogout} className="btn-logout focus-ring" aria-label="Sair da conta">
                 <LogOut size={13} /> Sair
               </button>
             </div>
@@ -74,13 +74,18 @@ const Header = () => {
         </nav>
 
         {/* Mobile Toggle */}
-        <button className="mobile-toggle" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label="Toggle Menu">
+        <button 
+          className="mobile-toggle focus-ring" 
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)} 
+          aria-label={mobileMenuOpen ? 'Fechar menu de navegação' : 'Abrir menu de navegação'} 
+          aria-expanded={mobileMenuOpen}
+        >
           {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
-          <div className="mobile-menu">
+          <div className="mobile-menu" aria-label="Menu móvel">
             <NavLink to="/" active={isActive('/')} icon={<Home size={18} />} label="Início" onClick={() => setMobileMenuOpen(false)} />
             {!user && (
               <>
@@ -101,7 +106,7 @@ const Header = () => {
                     <div className="user-name">{user.name}</div>
                     <div className="user-role">{user.role}</div>
                 </div>
-                <button onClick={handleLogout} className="btn-logout" style={{ width: '100%', justifyContent: 'center', marginTop: '0.5rem', background: 'var(--coral)', color: 'white', borderColor: 'var(--coral)' }}>
+                <button onClick={handleLogout} className="btn-logout focus-ring" style={{ width: '100%', justifyContent: 'center', marginTop: '0.5rem', background: 'var(--coral)', color: 'white', borderColor: 'var(--coral)' }} aria-label="Sair do sistema">
                   <LogOut size={16} /> Sair do Sistema
                 </button>
               </>
@@ -117,7 +122,8 @@ const NavLink = ({ to, active, icon, label, onClick }: { to: string; active: boo
   <Link
     to={to}
     onClick={onClick}
-    className={`nav-link ${active ? 'active' : ''}`}
+    className={`nav-link focus-ring ${active ? 'active' : ''}`}
+    aria-current={active ? 'page' : undefined}
   >
     {icon} <span>{label}</span>
   </Link>

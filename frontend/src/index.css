@@ -252,9 +252,46 @@ h1, h2, h3, h4, h5, h6 {
   100% { transform: translateY(0px); }
 }
 
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(50px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-50px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulseShadow {
+  0%, 100% {
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25), 0 0 0 0px rgba(37, 99, 235, 0.3);
+  }
+  50% {
+    box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4), 0 0 0 8px rgba(37, 99, 235, 0);
+  }
+}
+
 .animate-fade-in { animation: fadeInUp 0.8s var(--ease) forwards; }
 .animate-scale-in { animation: fadeInScale 0.6s var(--ease) forwards; }
 .animate-float { animation: float 4s ease-in-out infinite; }
+.animate-slide-in-right { animation: slideInRight 0.8s var(--ease-spring) forwards; }
+.animate-slide-in-left { animation: slideInLeft 0.8s var(--ease-spring) forwards; }
+.animate-pulse-cta { animation: pulseShadow 2.5s infinite; }
+
+/* Keyboard Accessibility Focus Rings */
+.focus-ring {
+  outline: none;
+  transition: all 0.2s var(--ease);
+}
+.focus-ring:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg-base), 0 0 0 4px var(--accent);
+}
+a.focus-ring:focus-visible, button.focus-ring:focus-visible {
+  outline: none;
+  border-color: var(--accent) !important;
+}
+
 
 /* ===== GLASSMORPHISM ===== */
 .glass {
