@@ -30,7 +30,8 @@ export const getDailyRoomAndToken = async (req: Request, res: Response) => {
 
     // A URL padrão de salas do Daily.co criadas pela API é https://<seu-dominio>.daily.co/<nome-da-sala>
     // Precisamos pegar isso do env ou compor com a API key que está no workspace.
-    const domain = config.dailyDomain; 
+    const rawDomain = config.dailyDomain || 'ferreirafxdev'; 
+    const domain = rawDomain.replace('.daily.co', ''); // Sanitiza caso o usuário tenha incluído .daily.co no .env
     const url = `https://${domain}.daily.co/${roomName}`;
 
     // 2. Gera o token seguro (Dono se isDoctor = true)
