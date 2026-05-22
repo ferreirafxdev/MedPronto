@@ -163,11 +163,12 @@ const ConsultationRoom = () => {
 
         {/* Bottom Row: Tabbed Records */}
         <div style={{ 
-            flex: 1, background: 'white', borderRadius: '1.5rem 1.5rem 0 0', 
-            color: '#0f172a', display: 'flex', flexDirection: 'column', overflow: 'hidden'
+            flex: 1, background: '#f8fafc', borderRadius: '1.5rem', 
+            color: '#0f172a', display: 'flex', flexDirection: 'column', overflow: 'hidden',
+            boxShadow: '0 10px 30px -5px rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)'
         }}>
           {/* Custom Tabs Navigation */}
-          <div style={{ display: 'flex', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', padding: '0 1.5rem' }}>
+          <div style={{ display: 'flex', background: 'white', borderBottom: '1px solid #e2e8f0', padding: '0 1.5rem', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
             <RecordTab active={activeTab === 'evolucao'} onClick={() => setActiveTab('evolucao')} icon={<Edit3 size={18}/>} label="EVOLUÇÃO CLÍNICA" />
             <RecordTab active={activeTab === 'receituario'} onClick={() => setActiveTab('receituario')} icon={<PenTool size={18}/>} label="RECEITUÁRIO" />
             <RecordTab active={activeTab === 'atestado'} onClick={() => setActiveTab('atestado')} icon={<FileText size={18}/>} label="ATESTADO MÉDICO" />
@@ -175,7 +176,7 @@ const ConsultationRoom = () => {
           </div>
 
           {/* Tab Content Area */}
-          <div style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>
+          <div style={{ flex: 1, padding: '2.5rem', overflowY: 'auto' }}>
              {activeTab === 'evolucao' && (
                 <div className="tab-content">
                    <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', fontWeight: 800 }}>NOTAS DE EVOLUÇÃO</h3>
@@ -254,18 +255,27 @@ const ConsultationRoom = () => {
         .btn-end:hover { background: #e11d48; transform: translateY(-2px); }
         
         .record-textarea {
-           width: 100%; height: 300px; border: none; background: #f8fafc;
-           border-radius: 1rem; padding: 1.5rem; font-size: 1rem; line-height: 1.6;
-           color: #1e293b; resize: none; outline: none; transition: all 0.2s;
-           border: 1px solid #e2e8f0;
+           width: 100%; height: 320px; border: none; background: white;
+           border-radius: 1rem; padding: 2rem; font-size: 1.05rem; line-height: 1.7;
+           color: #334155; resize: none; outline: none; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+           border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+           font-family: 'Inter', sans-serif;
         }
-        .record-textarea:focus { background: white; border-color: var(--accent); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); }
+        .record-textarea:focus { 
+           border-color: var(--accent); 
+           box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.15), 0 8px 10px -6px rgba(37, 99, 235, 0.1); 
+           transform: translateY(-2px);
+        }
 
-        .input-group label { display: block; font-size: 0.6rem; font-weight: 900; color: #94a3b8; margin-bottom: 0.3rem; }
+        .input-group label { display: block; font-size: 0.65rem; font-weight: 800; color: #64748b; margin-bottom: 0.4rem; letter-spacing: 0.05em; }
         .input-group input { 
-            padding: 0.5rem; border-radius: 0.5rem; border: 1px solid #e2e8f0; 
-            font-weight: 700; width: 100px; outline: none;
+            padding: 0.75rem 1rem; border-radius: 0.75rem; border: 1px solid #e2e8f0; 
+            font-weight: 700; width: 140px; outline: none; background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02); transition: all 0.2s;
+            color: #0f172a; font-size: 0.95rem;
         }
+        .input-group input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+
       `}</style>
     </div>
   );
