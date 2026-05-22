@@ -16,6 +16,8 @@ export const config = {
   supabaseKey: getEnv('SUPABASE_KEY'),
   jwtSecret: getEnv('JWT_SECRET'),
   adminPassword: getEnv('ADMIN_PASSWORD', 'admin123'),
+  dailyApiKey: getEnv('DAILY_API_KEY'),
+  dailyDomain: getEnv('DAILY_DOMAIN', 'ferreirafxdev'),
   s3: {
     endpoint: getEnv('S3_ENDPOINT'),
     region: getEnv('S3_REGION', 'us-east-1'),

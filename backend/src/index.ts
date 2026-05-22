@@ -22,13 +22,6 @@ dotenv.config();
 const app = express();
 
 // -- Middleware de Segurança e CORS --
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://127.0.0.1:5173',
-  'https://med-pronto-wph4.vercel.app',
-  'https://medpronto-online.vercel.app'
-];
-
 app.use(helmet({ contentSecurityPolicy: false })); // Proteção de headers HTTP
 const corsOptions = {
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {

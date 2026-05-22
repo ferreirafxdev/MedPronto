@@ -7,6 +7,6 @@ const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20 });
 
 router.post('/patient/auth', authLimiter, authController.patientAuth);
 router.post('/doctor/auth', authLimiter, authController.doctorAuth);
-router.post('/admin/auth', authController.adminAuth);
+router.post('/admin/auth', authLimiter, authController.adminAuth);
 
 export default router;
