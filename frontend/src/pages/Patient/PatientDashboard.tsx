@@ -42,6 +42,7 @@ const PatientDashboard = () => {
       try {
         const resp = await apiClient.get(`/api/patient/check-queue/${user.id}`);
         const isNewConsultation = searchParams.get('new_consultation') === 'true' || localStorage.getItem('payment_confirmed') === 'true';
+        const isJustRegistered = searchParams.get('just_registered') === 'true';
 
         if (resp.data.isActive) {
             // Need to fetch doctorId or roomId if active. 
@@ -52,11 +53,35 @@ const PatientDashboard = () => {
         } else if (resp.data.inQueue) {
           setInQueue(true);
           setLoading(false);
+        } else if (isJustRegistered) {
+          // Auto-enqueue patient with the complaint from registration
+          const tempComplaint = localStorage.getItem('temp_complaint') || 'Consulta Geral';
+          localStorage.removeItem('temp_complaint');
+          
+          // Clear query params so page refresh doesn't trigger auto-enqueue again
+          navigate('/patient/dashboard', { replace: true });
+          
+          setLoading(true);
+          try {
+            const enqueueResp = await apiClient.post('/api/enqueue', {
+              id: user.id,
+              name: user.name,
+              complaint: tempComplaint
+            });
+            if (enqueueResp.data.success) {
+              setInQueue(true);
+            }
+          } catch (err: any) {
+            console.error("Erro ao entrar na fila automaticamente:", err);
+            alert(err.response?.data?.error || "Erro ao entrar na fila automaticamente.");
+          } finally {
+            setLoading(false);
+          }
         } else if (isNewConsultation) {
            setShowComplaintModal(true);
            setLoading(false);
         } else {
-          setLoading(false);
+           setLoading(false);
         }
       } catch (e) { setLoading(false); }
     };

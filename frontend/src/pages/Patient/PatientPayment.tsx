@@ -40,12 +40,30 @@ const PatientPayment = () => {
   };
 
   const handleConfirmPayment = async () => {
-    if (!user) return;
     setLoading(true);
+    if (!user) {
+      // Guest Patient: simulate payment check and set flag for registration
+      setTimeout(() => {
+        try {
+          localStorage.setItem('payment_confirmed', 'true');
+          setStep(3);
+          setTimeout(() => {
+             navigate('/patient/login?mode=register');
+          }, 2500);
+        } catch (e) {
+          alert("Erro ao salvar dados de pagamento localmente. Tente novamente.");
+        } finally {
+          setLoading(false);
+        }
+      }, 1500);
+      return;
+    }
+
     try {
-      // Chama o backend para validar e registrar o pagamento no banco de dados
+      // Logged-in Patient: confirm payment in backend
       await apiClient.post('/api/payment/confirm', { patientId: user.id });
       
+      localStorage.setItem('payment_confirmed', 'true'); // redundancy beneficial for dashboard checks
       setStep(3);
       setTimeout(() => {
          navigate('/patient/dashboard?new_consultation=true');

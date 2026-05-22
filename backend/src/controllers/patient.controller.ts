@@ -13,7 +13,7 @@ export const registerPatient = async (req: Request, res: Response) => {
     // Insere no Supabase
     const { data: patient, error } = await supabase
       .from('patients')
-      .insert([{ name, cpf, age, email, birth_date: birthDate }])
+      .insert([{ name, cpf, age, email, birth_date: birthDate, has_active_payment: true }])
       .select()
       .single();
 

@@ -97,6 +97,10 @@ const PatientLogin = () => {
                 email: pat.email,
                 token
             });
+            // Store the complaint temporarily for auto-enqueue in the dashboard
+            if (formData.complaint) {
+              localStorage.setItem('temp_complaint', formData.complaint);
+            }
             // Clear payment flag and set just_registered for auto-enqueue
             localStorage.removeItem('payment_confirmed');
             navigate('/patient/dashboard?just_registered=true');
