@@ -5,9 +5,12 @@ import { prisma } from './utils/db';
 import { uploadPDF } from './utils/s3';
 import { PDFTemplate } from './PDFTemplate';
 
+const isTls = config.redis.url.startsWith('rediss://');
+
 const connection = new IORedis(config.redis.url, {
   maxRetriesPerRequest: null,
   enableReadyCheck: false,
+  ...(isTls ? { tls: { rejectUnauthorized: false } } : {})
 });
 
 export const patientQueue = new Queue('patient-queue', { connection });
