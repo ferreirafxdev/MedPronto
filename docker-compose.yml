@@ -8,7 +8,10 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin123}
       POSTGRES_DB: ${POSTGRES_DB:-medpronto}
     ports:
-      - "5432:5432"
+      - target: 5432
+        published: 5432
+        protocol: tcp
+        mode: host
     volumes:
       - postgres_data:/var/lib/postgresql/data
     deploy:
@@ -25,11 +28,22 @@ services:
       - COTURN_USER=${COTURN_USER:-user}
       - COTURN_PASSWORD=${COTURN_PASSWORD:-password}
     ports:
-      - "3478:3478"
-      - "3478:3478/udp"
-      - "5349:5349"
-      - "5349:5349/udp"
-      - "49152-65535:49152-65535/udp"
+      - target: 3478
+        published: 3478
+        protocol: tcp
+        mode: host
+      - target: 3478
+        published: 3478
+        protocol: udp
+        mode: host
+      - target: 5349
+        published: 5349
+        protocol: tcp
+        mode: host
+      - target: 5349
+        published: 5349
+        protocol: udp
+        mode: host
     deploy:
       restart_policy:
         condition: on-failure
