@@ -3,23 +3,20 @@ version: '3.8'
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: medpronto-postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-admin}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin123}
       POSTGRES_DB: ${POSTGRES_DB:-medpronto}
     ports:
-      # Exposto na VPS para a API no Render conseguir conectar
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
-    networks:
-      - medpronto-network
+    deploy:
+      restart_policy:
+        condition: on-failure
 
   coturn:
     image: coturn/coturn
-    container_name: medpronto-coturn
     command: >
       --log-file=stdout --listening-port=3478 --tls-listening-port=5349 --listening-ip=0.0.0.0 --relay-ip=0.0.0.0 --external-ip=$COTURN_EXTERNAL_IP --min-port=49152 --max-port=65535 --realm=$COTURN_REALM --user=$COTURN_USER:$COTURN_PASSWORD
     environment:
@@ -32,15 +29,10 @@ services:
       - "3478:3478/udp"
       - "5349:5349"
       - "5349:5349/udp"
-      # Range expandido recomendado para conexões WebRTC estáveis
       - "49152-65535:49152-65535/udp"
-    restart: unless-stopped
-    networks:
-      - medpronto-network
+    deploy:
+      restart_policy:
+        condition: on-failure
 
 volumes:
   postgres_data:
-
-networks:
-  medpronto-network:
-    driver: bridge
