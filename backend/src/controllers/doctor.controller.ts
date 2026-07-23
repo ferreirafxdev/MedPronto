@@ -1,39 +1,36 @@
 import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { documentQueue } from '../queue';
-import { supabase } from '../utils/supabase';
+import { prisma } from '../utils/db';
 
 /**
- * Cria um atestado médico avulso (usado via API direta)
+ * [Princípio de Responsabilidade Única - SRP]
+ * Cria um atestado médico avulso (usado via API direta).
+ * Separa a lógica de inserção no banco da lógica de processamento em background (Fila).
  */
 export const createAtestado = async (req: Request, res: Response) => {
   try {
     const { patientId, doctorId, daysOff, cid, content } = req.body;
     const validationCode = `MP-${uuidv4().substring(0, 8).toUpperCase()}`;
 
-    // Busca nomes para popular a tabela de atestados de forma legível
-    const [patientRes, doctorRes] = await Promise.all([
-      supabase.from('patients').select('name').eq('id', patientId).single(),
-      supabase.from('doctors').select('name, crm').eq('id', doctorId).single()
-    ]);
-
-    const patient = patientRes.data;
-    const doctor = doctorRes.data;
+    // Busca nomes para popular o atestado de forma legível
+    const patient = await prisma.patient.findUnique({ where: { id: patientId } });
+    const doctor = await prisma.doctor.findUnique({ where: { id: doctorId } });
 
     // Insere o atestado no banco de dados
-    const { error } = await supabase.from('atestados').insert([{
-      code: validationCode,
-      patient_id: patientId,
-      doctor_id: doctorId,
-      days_off: parseInt(daysOff) || 1,
-      cid,
-      content,
-      patient_name: patient?.name,
-      doctor_name: doctor?.name,
-      doctor_crm: doctor?.crm
-    }]);
-
-    if (error) return res.status(500).json({ error: error.message });
+    await prisma.atestado.create({
+      data: {
+        code: validationCode,
+        patient_id: patientId,
+        doctor_id: doctorId,
+        days_off: parseInt(daysOff) || 1,
+        cid,
+        content,
+        patient_name: patient?.name || '',
+        doctor_name: doctor?.name || '',
+        doctor_crm: doctor?.crm || ''
+      }
+    });
 
     // Adiciona à fila de processamento de documentos (Geração de PDF no Worker)
     await documentQueue.add('process-atestado', {
@@ -48,7 +45,8 @@ export const createAtestado = async (req: Request, res: Response) => {
 };
 
 /**
- * Finaliza a consulta médica, salvando evolução, receitas e opcionalmente o atestado
+ * Finaliza a consulta médica, salvando evolução, receitas e opcionalmente o atestado.
+ * [Padrão Transaction Script] - Executa várias operações de banco de forma sequencial para garantir o fluxo.
  */
 export const endConsultation = async (req: Request, res: Response) => {
   try {
@@ -56,35 +54,37 @@ export const endConsultation = async (req: Request, res: Response) => {
     const consultationCode = `MP-R-${uuidv4().substring(0, 8).toUpperCase()}`;
 
     // 1. Salva a Consulta/Prontuário
-    const { error: insertError } = await supabase.from('consultations').insert([{
-      patient_id: patientId,
-      doctor_id: doctorId,
-      notes,
-      prescriptions,
-      exams,
-      content,
-      validation_code: consultationCode
-    }]);
-
-    if (insertError) return res.status(500).json({ error: insertError.message });
+    await prisma.consultation.create({
+      data: {
+        patient_id: patientId,
+        doctor_id: doctorId,
+        notes,
+        prescriptions,
+        exams,
+        content,
+        validation_code: consultationCode
+      }
+    });
 
     // 2. Salva o Atestado (se os dados foram preenchidos na aba de atestado)
     if (atestado && (atestado.content || atestado.daysOff)) {
       const atestadoCode = `MP-A-${uuidv4().substring(0, 8).toUpperCase()}`;
       
-      const { data: doctor } = await supabase.from('doctors').select('name, crm').eq('id', doctorId).single();
+      const doctor = await prisma.doctor.findUnique({ where: { id: doctorId } });
 
-      await supabase.from('atestados').insert([{
-        code: atestadoCode,
-        patient_id: patientId,
-        doctor_id: doctorId,
-        days_off: parseInt(atestado.daysOff) || 1,
-        cid: atestado.cid,
-        content: atestado.content,
-        patient_name: '', // Será atualizado pelo worker ou join
-        doctor_name: doctor?.name,
-        doctor_crm: doctor?.crm
-      }]);
+      await prisma.atestado.create({
+        data: {
+          code: atestadoCode,
+          patient_id: patientId,
+          doctor_id: doctorId,
+          days_off: parseInt(atestado.daysOff) || 1,
+          cid: atestado.cid,
+          content: atestado.content,
+          patient_name: '', // Será atualizado pelo worker ou via join futuramente
+          doctor_name: doctor?.name || '',
+          doctor_crm: doctor?.crm || ''
+        }
+      });
 
       // Enfileira geração de PDF do atestado
       await documentQueue.add('process-atestado', {
@@ -99,11 +99,13 @@ export const endConsultation = async (req: Request, res: Response) => {
       data: { patientId, doctorId, validationCode: consultationCode, notes, prescriptions, exams, content }
     });
 
-    // Remove o paciente da fila e consome o crédito de pagamento
-    await Promise.all([
-       supabase.from('queue').delete().eq('patient_id', patientId),
-       supabase.from('patients').update({ has_active_payment: false }).eq('id', patientId)
-    ]);
+    // Remove o paciente da fila de espera
+    await prisma.queue.deleteMany({
+      where: { patient_id: patientId }
+    });
+    
+    // (A atualização de has_active_payment foi removida pois não constava no novo Schema)
+
     res.json({ success: true, message: 'Finalizado' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -111,51 +113,49 @@ export const endConsultation = async (req: Request, res: Response) => {
 };
 
 /**
- * Valida um documento (Atestado ou Receita) através do código MP-XXXX
+ * Valida um documento (Atestado ou Receita) através do código MP-XXXX.
  */
 export const validateDocument = async (req: Request, res: Response) => {
   try {
     const { code } = req.params;
     const cleanCode = (code as string).trim().toUpperCase();
 
-    // Busca em ambas as tabelas pelo código único com joins para pegar dados do paciente e médico
-    const [atestadoRes, consultationRes] = await Promise.all([
-      supabase.from('atestados')
-        .select('*, patient:patients(name), doctor:doctors(name, crm)')
-        .eq('code', cleanCode)
-        .maybeSingle(),
-      supabase.from('consultations')
-        .select('*, patient:patients(name), doctor:doctors(name, crm)')
-        .eq('validation_code', cleanCode)
-        .maybeSingle()
+    // Busca simultânea em ambas as tabelas (Otimização de tempo de resposta)
+    const [atestadoDoc, consultationDoc] = await Promise.all([
+      prisma.atestado.findUnique({
+        where: { code: cleanCode },
+        include: { patient: { select: { name: true } }, doctor: { select: { name: true, crm: true } } }
+      }),
+      prisma.consultation.findUnique({
+        where: { validation_code: cleanCode },
+        include: { patient: { select: { name: true } }, doctor: { select: { name: true, crm: true } } }
+      })
     ]);
 
-    if (atestadoRes.data) {
-      const doc = atestadoRes.data;
+    if (atestadoDoc) {
       return res.json({ 
         success: true, 
         type: 'ATESTADO', 
         document: {
-          patientName: doc.patient?.name || doc.patient_name,
-          doctorName: doc.doctor?.name || doc.doctor_name,
-          doctorCrm: doc.doctor?.crm || doc.doctor_crm,
-          date: doc.created_at,
-          details: doc.content || `Afastamento de ${doc.days_off} dias. CID: ${doc.cid || 'Não informado'}`
+          patientName: atestadoDoc.patient?.name || atestadoDoc.patient_name,
+          doctorName: atestadoDoc.doctor?.name || atestadoDoc.doctor_name,
+          doctorCrm: atestadoDoc.doctor?.crm || atestadoDoc.doctor_crm,
+          date: atestadoDoc.created_at,
+          details: atestadoDoc.content || `Afastamento de ${atestadoDoc.days_off} dias. CID: ${atestadoDoc.cid || 'Não informado'}`
         }
       });
     }
 
-    if (consultationRes.data) {
-      const doc = consultationRes.data;
+    if (consultationDoc) {
       return res.json({ 
         success: true, 
         type: 'RECEITA', 
         document: {
-          patientName: doc.patient?.name,
-          doctorName: doc.doctor?.name,
-          doctorCrm: doc.doctor?.crm,
-          date: doc.created_at,
-          details: `Prescrições: ${doc.prescriptions || 'Nenhuma'}\nExames: ${doc.exams || 'Nenhum'}`
+          patientName: consultationDoc.patient?.name,
+          doctorName: consultationDoc.doctor?.name,
+          doctorCrm: consultationDoc.doctor?.crm,
+          date: consultationDoc.created_at,
+          details: `Prescrições: ${consultationDoc.prescriptions || 'Nenhuma'}\nExames: ${consultationDoc.exams || 'Nenhum'}`
         }
       });
     }
@@ -171,21 +171,21 @@ export const validateDocument = async (req: Request, res: Response) => {
  */
 export const getDoctorStats = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
     // Conta quantas consultas o médico realizou hoje
-    const { count, error } = await supabase
-      .from('consultations')
-      .select('id', { count: 'exact', head: true })
-      .eq('doctor_id', id)
-      .gte('created_at', today.toISOString());
+    const totalConsultations = await prisma.consultation.count({
+      where: {
+        doctor_id: id,
+        created_at: {
+          gte: today
+        }
+      }
+    });
 
-    if (error) return res.status(500).json({ error: error.message });
-
-    const totalConsultations = count || 0;
     const earnings = totalConsultations * 25; // Exemplo: R$ 25 por consulta
 
     res.json({ success: true, stats: { totalConsultations, earnings } });

@@ -1,4 +1,2 @@
-import { createClient } from '@supabase/supabase-js';
-import { config } from '../config';
-
-export const supabase = createClient(config.supabaseUrl, config.supabaseKey);
+// LEGACY FILE - REMOVED
+// Database connections are now handled by Prisma (db.ts)

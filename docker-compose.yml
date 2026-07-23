@@ -1,0 +1,104 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: medpronto-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin123}
+      POSTGRES_DB: ${POSTGRES_DB:-medpronto}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - medpronto-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: medpronto-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - medpronto-network
+
+  coturn:
+    image: coturn/coturn
+    container_name: medpronto-coturn
+    command: >
+      --log-file=stdout
+      --listening-port=3478
+      --tls-listening-port=5349
+      --listening-ip=0.0.0.0
+      --relay-ip=0.0.0.0
+      --external-ip=$COTURN_EXTERNAL_IP
+      --min-port=49152
+      --max-port=65535
+      --realm=$COTURN_REALM
+      --user=$COTURN_USER:$COTURN_PASSWORD
+    environment:
+      - COTURN_EXTERNAL_IP=${COTURN_EXTERNAL_IP:-127.0.0.1}
+      - COTURN_REALM=${COTURN_REALM:-medpronto.local}
+      - COTURN_USER=${COTURN_USER:-user}
+      - COTURN_PASSWORD=${COTURN_PASSWORD:-password}
+    ports:
+      - "3478:3478"
+      - "3478:3478/udp"
+      - "5349:5349"
+      - "5349:5349/udp"
+      - "49152-49160:49152-49160/udp"
+    restart: unless-stopped
+    networks:
+      - medpronto-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: medpronto-backend
+    environment:
+      - PORT=3001
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-admin123}@postgres:5432/${POSTGRES_DB:-medpronto}?schema=public
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET:-supersecretjwt}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
+      - S3_ENDPOINT=${S3_ENDPOINT:-https://bfada6f05278181875b5d34342012236.r2.cloudflarestorage.com}
+      - S3_REGION=${S3_REGION:-enam}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY}
+      - S3_SECRET_KEY=${S3_SECRET_KEY}
+      - S3_BUCKET=${S3_BUCKET:-prontuarios}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:5173}
+    ports:
+      - "3001:3001"
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+    networks:
+      - medpronto-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: medpronto-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - medpronto-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  medpronto-network:
+    driver: bridge

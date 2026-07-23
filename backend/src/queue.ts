@@ -1,7 +1,7 @@
 import { Queue, Worker, Job } from 'bullmq';
 import { config } from './config';
 import IORedis from 'ioredis';
-import { supabase } from './utils/supabase';
+import { prisma } from './utils/db';
 import { uploadPDF } from './utils/s3';
 import { PDFTemplate } from './PDFTemplate';
 
@@ -14,14 +14,14 @@ export const patientQueue = new Queue('patient-queue', { connection });
 export const documentQueue = new Queue('document-queue', { connection });
 
 async function generatePDFBuffer(type: string, data: any): Promise<Buffer> {
-  // Busca informações do paciente e do médico no Supabase para inclusão dinâmica
-  const [patientRes, doctorRes] = await Promise.all([
-    supabase.from('patients').select('name').eq('id', data.patientId).maybeSingle(),
-    supabase.from('doctors').select('name, crm').eq('id', data.doctorId).maybeSingle()
+  // Busca informações do paciente e do médico via Prisma para inclusão dinâmica no PDF
+  const [patient, doctor] = await Promise.all([
+    prisma.patient.findUnique({ where: { id: data.patientId } }),
+    prisma.doctor.findUnique({ where: { id: data.doctorId } })
   ]);
-  const patientName = patientRes.data?.name || 'Paciente';
-  const doctorName = doctorRes.data?.name || 'Médico';
-  const doctorCRM = doctorRes.data?.crm || 'CRM-SP 00000';
+  const patientName = patient?.name || 'Paciente';
+  const doctorName = doctor?.name || 'Médico';
+  const doctorCRM = doctor?.crm || 'CRM-SP 00000';
 
   return new Promise((resolve, reject) => {
     try {
@@ -54,6 +54,7 @@ async function generatePDFBuffer(type: string, data: any): Promise<Buffer> {
   });
 }
 
+// Background Worker para processar geração assíncrona de PDFs
 export const documentWorker = new Worker('document-queue', async (job: Job) => {
   const { type, data } = job.data;
   console.log(`[Worker] Processing ${type} for patient ${data.patientId}`);
@@ -64,15 +65,21 @@ export const documentWorker = new Worker('document-queue', async (job: Job) => {
     const folder = type === 'GENERATE_ATESTADO' ? 'atestados' : 'consultations';
     const filePath = `${folder}/${fileName}`;
 
+    // Cloudflare R2 / AWS S3 Upload (Mantido conforme Fase 3)
     await uploadPDF(config.s3.bucket, filePath, pdfBuffer);
 
-    // Update Supabase with the PDF path
-    const table = type === 'GENERATE_ATESTADO' ? 'atestados' : 'consultations';
-    const codeColumn = type === 'GENERATE_ATESTADO' ? 'code' : 'validation_code';
-
-    await supabase.from(table)
-      .update({ pdf_path: filePath })
-      .eq(codeColumn, data.validationCode);
+    // Update PostgreSQL via Prisma with the PDF path
+    if (type === 'GENERATE_ATESTADO') {
+      await prisma.atestado.update({
+        where: { code: data.validationCode },
+        data: { pdf_path: filePath }
+      });
+    } else {
+      await prisma.consultation.update({
+        where: { validation_code: data.validationCode },
+        data: { pdf_path: filePath }
+      });
+    }
 
     console.log(`✅ ${type} processed and uploaded: ${filePath}`);
   } catch (err) {

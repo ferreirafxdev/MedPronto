@@ -1,29 +1,38 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
-import { supabase } from '../utils/supabase';
+import { prisma } from '../utils/db';
 import { patientQueue, documentQueue } from '../queue';
 import { serverLogs } from '../index';
 
 /**
- * Retorna o status da infraestrutura (Supabase, Redis, Filas e Logs)
+ * [Princípio de Responsabilidade Única - SRP]
+ * Retorna exclusivamente o status da infraestrutura (Banco de Dados, Redis, Filas e Logs).
+ * Útil para dashboards de monitoramento e testes de healthcheck.
  */
 export const getInfraStatus = async (req: Request, res: Response) => {
   try {
-    // Testa conexão com Supabase
-    const { error: sbError } = await supabase.from('patients').select('id').limit(1);
+    // Testa conexão com PostgreSQL via Prisma
+    let dbStatus = 'connected';
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+    } catch (dbError) {
+      dbStatus = 'error';
+    }
     
-    // Testa conexão com Redis
+    // Testa conexão com Redis (BullMQ Queue)
     let redisStatus = 'connected';
     try {
       const client = await patientQueue.client;
-      await client.ping();
-    } catch (e) { redisStatus = 'disconnected'; }
+      await (client as any).ping();
+    } catch (e) { 
+      redisStatus = 'disconnected'; 
+    }
 
     res.json({
       success: true,
       services: {
         api: 'online',
-        supabase: sbError ? 'error' : 'online',
+        database: dbStatus, // Substituiu o 'supabase' do código antigo
         redis: redisStatus,
       },
       queues: {
@@ -38,110 +47,150 @@ export const getInfraStatus = async (req: Request, res: Response) => {
 };
 
 /**
- * Lista todos os médicos cadastrados
+ * [Princípio de Responsabilidade Única - SRP]
+ * Obtém a lista de médicos ordenados por nome.
  */
 export const getDoctors = async (req: Request, res: Response) => {
   try {
-    const { data: doctors, error } = await supabase.from('doctors').select('*').order('name');
-    if (error) return res.status(500).json({ error: error.message });
+    const doctors = await prisma.doctor.findMany({
+      orderBy: { name: 'asc' }
+    });
     res.json({ success: true, doctors });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { 
+    res.status(500).json({ error: err.message }); 
+  }
 };
 
 /**
- * Cria um novo perfil médico
+ * Cria um novo perfil médico aplicando hash seguro na senha.
  */
 export const createDoctor = async (req: Request, res: Response) => {
   try {
     const { name, crm, email, password, specialty, cpf } = req.body;
+    
+    // Criptografia da senha antes de persistir no banco (Segurança)
     const hashedPassword = await bcrypt.hash(password, 10);
     
-    // Tratamento para CPF: se vazio, envia null para evitar conflito de UNIQUE
-    const doctorData = { 
-      name, 
-      crm, 
-      email, 
-      password: hashedPassword, 
-      specialty, 
-      cpf: cpf && cpf.trim() !== '' ? cpf : null 
-    };
+    const doctor = await prisma.doctor.create({
+      data: {
+        name,
+        crm,
+        email,
+        password: hashedPassword,
+        specialty,
+        cpf: cpf && cpf.trim() !== '' ? cpf : null
+      }
+    });
 
-    const { data: doctor, error } = await supabase
-      .from('doctors')
-      .insert([doctorData])
-      .select()
-      .single();
-
-    if (error) return res.status(500).json({ error: error.message });
     res.json({ success: true, doctor });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { 
+    res.status(500).json({ error: err.message }); 
+  }
 };
 
 /**
- * Remove um médico pelo ID
+ * Remove um médico pelo seu identificador (ID).
  */
 export const deleteDoctor = async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-    const { error } = await supabase.from('doctors').delete().eq('id', id);
-    if (error) return res.status(500).json({ error: error.message });
+    const id = req.params.id as string;
+    
+    await prisma.doctor.delete({
+      where: { id }
+    });
+    
     res.json({ success: true });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { 
+    res.status(500).json({ error: err.message }); 
+  }
 };
 
 /**
- * Busca pacientes por nome ou CPF
+ * Busca pacientes filtrando por nome ou CPF, ou retorna todos se nenhum filtro for passado.
  */
 export const getPatients = async (req: Request, res: Response) => {
   try {
-    const { search } = req.query;
-    let query = supabase.from('patients').select('*').order('name');
-    if (search) {
-      query = query.or(`name.ilike.%${search}%,cpf.eq.${search}`);
-    }
-    const { data: patients, error } = await query;
-    if (error) return res.status(500).json({ error: error.message });
+    const search = req.query.search as string | undefined;
+    
+    // Condição de busca flexível para nome ou cpf
+    const whereCondition = search ? {
+      OR: [
+        { name: { contains: search, mode: 'insensitive' as any } },
+        { cpf: { equals: search } }
+      ]
+    } : {};
+
+    const patients = await prisma.patient.findMany({
+      where: whereCondition,
+      orderBy: { name: 'asc' }
+    });
+    
     res.json({ success: true, patients });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { 
+    res.status(500).json({ error: err.message }); 
+  }
 };
 
 /**
- * Libera ou bloqueia o download de um documento pelo paciente
+ * [Princípio de Aberto/Fechado - OCP]
+ * Altera o status de liberação de download de um documento. 
+ * Projetado para suportar qualquer tipo de tabela mapeada.
  */
 export const releaseDocument = async (req: Request, res: Response) => {
   try {
     const { type, id, released } = req.body;
-    const table = type === 'ATESTADO' ? 'atestados' : 'consultations';
-    const { error } = await supabase.from(table).update({ download_released: released }).eq('id', id);
-    if (error) return res.status(500).json({ error: error.message });
+    
+    if (type === 'ATESTADO') {
+      await prisma.atestado.update({
+        where: { id },
+        data: { download_released: released }
+      });
+    } else {
+      await prisma.consultation.update({
+        where: { id },
+        data: { download_released: released }
+      });
+    }
+    
     res.json({ success: true });
-  } catch (err: any) { res.status(500).json({ error: err.message }); }
+  } catch (err: any) { 
+    res.status(500).json({ error: err.message }); 
+  }
 };
 
 /**
- * Obtém o histórico completo (prontuário) de um paciente específico
+ * [Agregação de Dados]
+ * Obtém o histórico completo (prontuário) de um paciente unindo Consultas e Atestados.
  */
 export const getPatientRecord = async (req: Request, res: Response) => {
   try {
-    const { patientId } = req.params;
+    const patientId = req.params.patientId as string;
 
-    // Busca dados do paciente e documentos vinculados (com join de médico)
-    const [patientRes, consultationsRes, atestadosRes] = await Promise.all([
-      supabase.from('patients').select('*').eq('id', patientId).single(),
-      supabase.from('consultations').select('*, doctor:doctors(name, crm)').eq('patient_id', patientId).order('created_at', { ascending: false }),
-      supabase.from('atestados').select('*, doctor:doctors(name, crm)').eq('patient_id', patientId).order('created_at', { ascending: false })
+    // Realiza a busca paralela dos dados do paciente e seus documentos vinculados
+    const [patient, consultations, atestados] = await Promise.all([
+      prisma.patient.findUnique({ where: { id: patientId } }),
+      prisma.consultation.findMany({
+        where: { patient_id: patientId },
+        orderBy: { created_at: 'desc' },
+        include: { doctor: { select: { name: true, crm: true } } }
+      }),
+      prisma.atestado.findMany({
+        where: { patient_id: patientId },
+        orderBy: { created_at: 'desc' },
+        include: { doctor: { select: { name: true, crm: true } } }
+      })
     ]);
 
-    if (patientRes.error) return res.status(404).json({ error: 'Paciente não encontrado' });
+    if (!patient) return res.status(404).json({ error: 'Paciente não encontrado' });
 
-    // Mapeia os dados do médico para o primeiro nível do objeto
-    const consultations = (consultationsRes.data || []).map((c: any) => ({
+    // Achata o objeto do médico para o formato esperado pelo frontend
+    const mappedConsultations = consultations.map((c: any) => ({
       ...c,
       doctor_name: c.doctor?.name,
       doctor_crm: c.doctor?.crm
     }));
 
-    const atestados = (atestadosRes.data || []).map((a: any) => ({
+    const mappedAtestados = atestados.map((a: any) => ({
       ...a,
       doctor_name: a.doctor?.name,
       doctor_crm: a.doctor?.crm
@@ -149,10 +198,10 @@ export const getPatientRecord = async (req: Request, res: Response) => {
 
     res.json({
       success: true,
-      patient: patientRes.data,
+      patient,
       record: {
-        consultations,
-        atestados
+        consultations: mappedConsultations,
+        atestados: mappedAtestados
       }
     });
   } catch (err: any) {

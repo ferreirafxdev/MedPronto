@@ -21,7 +21,6 @@ const ConsultationRoom = () => {
   const [loading, setLoading] = useState(false);
   const [consultationTime, setConsultationTime] = useState(0);
   const [patient, setPatient] = useState<any>(null);
-  const [dailyConfig, setDailyConfig] = useState<{url: string, token: string} | null>(null);
 
   // Estados dos documentos
   const [notes, setNotes] = useState('');
@@ -34,22 +33,8 @@ const ConsultationRoom = () => {
   useEffect(() => { 
     const t = setInterval(() => setConsultationTime(p => p + 1), 1000); 
     fetchPatientData();
-    fetchDailyToken();
     return () => clearInterval(t); 
   }, []);
-
-  const fetchDailyToken = async () => {
-    try {
-      const res = await apiClient.post('/api/daily/token', {
-        room: roomId,
-        username: user?.name || 'Médico',
-        isDoctor: true
-      });
-      setDailyConfig({ url: res.data.url, token: res.data.token });
-    } catch (err) {
-      console.error("Erro ao obter token do Daily.co", err);
-    }
-  };
 
   const fetchPatientData = async () => {
     try {
@@ -123,10 +108,10 @@ const ConsultationRoom = () => {
               overflow: 'hidden', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
               border: '1px solid rgba(255,255,255,0.05)'
           }}>
-             {dailyConfig ? (
-                 <DailyVideo roomUrl={dailyConfig.url} token={dailyConfig.token} />
+             {roomId ? (
+                 <DailyVideo roomId={roomId} role="doctor" userName={user?.name || 'Médico'} />
              ) : (
-                 <div style={{ color: 'white', display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center' }}>Inicializando sala segura (Daily.co)...</div>
+                 <div style={{ color: 'white', display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center' }}>Inicializando sala segura...</div>
              )}
             <div style={{ position: 'absolute', bottom: '1rem', left: '1rem', background: 'rgba(0,0,0,0.5)', padding: '0.4rem 0.8rem', borderRadius: '2rem', fontSize: '0.7rem', backdropFilter: 'blur(4px)', zIndex: 50, pointerEvents: 'none' }}>
                CONEXÃO ESTÁVEL P2P

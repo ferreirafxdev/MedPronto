@@ -10,15 +10,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@daily-co/daily-js": "^0.90.0",
-    "@supabase/supabase-js": "^2.100.1",
     "axios": "^1.14.0",
     "lucide-react": "^1.7.0",
-    "openvidu-browser": "^2.32.2",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-router-dom": "^7.13.2",
     "simple-peer": "^9.11.1",
+    "socket.io-client": "^4.8.1",
     "zustand": "^5.0.12"
   },
   "devDependencies": {
@@ -26,6 +24,7 @@
     "@types/node": "^24.12.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@types/simple-peer": "^9.11.8",
     "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^9.39.4",
     "eslint-plugin-react-hooks": "^7.0.1",

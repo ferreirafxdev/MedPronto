@@ -1,15 +1,17 @@
 import axios from 'axios';
 import { useStore } from '../store/useStore';
 
+// Sanitiza a URL Base para evitar duplicidades do prefixo /api
+const rawBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const baseURL = rawBaseUrl.replace(/\/api\/?$/, '');
+
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001',
+  baseURL: baseURL,
 });
 
-// Interceptor to add Authorization header
+// Interceptor para injetar o token JWT de Autorização
 apiClient.interceptors.request.use(
   (config) => {
-    // We can't use useStore() hook here directly if it's outside a component,
-    // so we accesszustand state directly if needed, or use the store's getState.
     const state = useStore.getState();
     const token = state.user?.token;
     

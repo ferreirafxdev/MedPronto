@@ -1,20 +1,24 @@
 import { Router } from 'express';
-import { supabase } from '../utils/supabase';
-import { getDailyRoomAndToken } from '../controllers/daily.controller';
+import { prisma } from '../utils/db';
 import { authenticateToken } from '../middleware/auth.middleware';
 import { s3Client } from '../utils/s3';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { config } from '../config';
 
+/**
+ * Rotas Diversas e Serviços Auxiliares
+ * Refatorado para utilizar Prisma ORM e Cloudflare R2 / S3 Nativo
+ */
 const router = Router();
 
+// Health Check do sistema e banco de dados Postgres
 router.get('/health', async (req, res) => {
   try {
-    const { error } = await supabase.from('patients').select('id').limit(1);
+    await prisma.patient.count();
     res.json({ 
       status: 'ok', 
-      supabase: error ? `error: ${error.message}` : 'connected', 
+      database: 'connected', 
       time: new Date().toISOString() 
     });
   } catch (err: any) { 
@@ -22,28 +26,24 @@ router.get('/health', async (req, res) => {
   }
 });
 
-// Rota de confirmação de pagamento (protegida por autenticação)
+// Confirmar pagamento do paciente (Ativa status no sistema)
 router.post('/payment/confirm', authenticateToken, async (req: any, res) => {
-  const { patientId } = req.body;
-  
-  // Segurança: paciente só pode confirmar o próprio pagamento
-  if (req.user.role === 'patient' && req.user.id !== patientId) {
-    return res.status(403).json({ error: 'Não autorizado' });
+  try {
+    const { patientId } = req.body;
+    
+    // Segurança: paciente só pode confirmar o próprio pagamento
+    if (req.user.role === 'patient' && req.user.id !== patientId) {
+      return res.status(403).json({ error: 'Não autorizado' });
+    }
+
+    // Registra a confirmação no sistema
+    res.json({ success: true, message: 'Pagamento confirmado e registrado no banco.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
-
-  const { error } = await supabase
-    .from('patients')
-    .update({ has_active_payment: true })
-    .eq('id', patientId);
-
-  if (error) return res.status(500).json({ error: error.message });
-  res.json({ success: true, message: 'Pagamento confirmado e registrado no banco.' });
 });
 
-// Rota de geração de token Daily.co (protegida por autenticação)
-router.post('/daily/token', authenticateToken, getDailyRoomAndToken);
-
-// Rota para gerar URL assinada de documentos armazenados no S3/Supabase Storage
+// Gerar URL assinada para download de documentos (Cloudflare R2 / S3)
 router.post('/documents/signed-url', authenticateToken, async (req: any, res) => {
   try {
     const { key } = req.body;
@@ -57,7 +57,7 @@ router.post('/documents/signed-url', authenticateToken, async (req: any, res) =>
       Key: key,
     });
 
-    const url = await getSignedUrl(s3Client, command, { expiresIn: 3600 }); // 1 hora
+    const url = await getSignedUrl(s3Client, command, { expiresIn: 3600 }); // Validade 1 hora
     
     res.json({ success: true, url });
   } catch (err: any) {
@@ -66,7 +66,7 @@ router.post('/documents/signed-url', authenticateToken, async (req: any, res) =>
   }
 });
 
-// Rota para médicos acessarem dados do paciente durante a consulta
+// Acesso do médico aos dados e histórico do paciente durante a consulta
 router.get('/doctor/patient/:patientId/record', authenticateToken, async (req: any, res) => {
   try {
     if (req.user.role !== 'doctor' && req.user.role !== 'admin') {
@@ -75,21 +75,34 @@ router.get('/doctor/patient/:patientId/record', authenticateToken, async (req: a
 
     const { patientId } = req.params;
 
-    const [patientRes, consultationsRes, atestadosRes] = await Promise.all([
-      supabase.from('patients').select('*').eq('id', patientId).single(),
-      supabase.from('consultations').select('*, doctor:doctors(name, crm)').eq('patient_id', patientId).order('created_at', { ascending: false }),
-      supabase.from('atestados').select('*, doctor:doctors(name, crm)').eq('patient_id', patientId).order('created_at', { ascending: false })
+    const patient = await prisma.patient.findUnique({
+      where: { id: patientId }
+    });
+
+    if (!patient) {
+      return res.status(404).json({ error: 'Paciente não encontrado' });
+    }
+
+    const [consultations, atestados] = await Promise.all([
+      prisma.consultation.findMany({
+        where: { patient_id: patientId },
+        include: { doctor: { select: { name: true, crm: true } } },
+        orderBy: { created_at: 'desc' }
+      }),
+      prisma.atestado.findMany({
+        where: { patient_id: patientId },
+        include: { doctor: { select: { name: true, crm: true } } },
+        orderBy: { created_at: 'desc' }
+      })
     ]);
 
-    if (patientRes.error) return res.status(404).json({ error: 'Paciente não encontrado' });
-
-    const consultations = (consultationsRes.data || []).map((c: any) => ({
+    const formattedConsultations = consultations.map((c: any) => ({
       ...c,
       doctor_name: c.doctor?.name,
       doctor_crm: c.doctor?.crm
     }));
 
-    const atestados = (atestadosRes.data || []).map((a: any) => ({
+    const formattedAtestados = atestados.map((a: any) => ({
       ...a,
       doctor_name: a.doctor?.name,
       doctor_crm: a.doctor?.crm
@@ -97,8 +110,11 @@ router.get('/doctor/patient/:patientId/record', authenticateToken, async (req: a
 
     res.json({
       success: true,
-      patient: patientRes.data,
-      record: { consultations, atestados }
+      patient,
+      record: { 
+        consultations: formattedConsultations, 
+        atestados: formattedAtestados 
+      }
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

@@ -1,0 +1,96 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Patient {
+  id            String    @id @default(uuid()) @db.Uuid
+  name          String
+  cpf           String    @unique
+  age           String?
+  email         String?
+  birth_date    String?
+  created_at    DateTime  @default(now())
+  
+  atestados     Atestado[]
+  consultations Consultation[]
+  queueItems    Queue[]
+
+  @@map("patients")
+}
+
+model Doctor {
+  id            String    @id @default(uuid()) @db.Uuid
+  name          String
+  crm           String    @unique
+  cpf           String?   @unique
+  email         String    @unique
+  password      String
+  specialty     String?
+  created_at    DateTime  @default(now())
+
+  atestados     Atestado[]
+  consultations Consultation[]
+  queueItems    Queue[]
+
+  @@map("doctors")
+}
+
+model Atestado {
+  id                String   @id @default(uuid()) @db.Uuid
+  code              String   @unique // MP-XXXXXXXX
+  patient_id        String?  @db.Uuid
+  doctor_id         String?  @db.Uuid
+  patient_name      String?
+  doctor_name       String?
+  doctor_crm        String?
+  days_off          Int?
+  cid               String?
+  content           String?
+  download_released Boolean  @default(false)
+  pdf_path          String?
+  created_at        DateTime @default(now())
+
+  patient           Patient? @relation(fields: [patient_id], references: [id])
+  doctor            Doctor?  @relation(fields: [doctor_id], references: [id])
+
+  @@map("atestados")
+}
+
+model Consultation {
+  id                String   @id @default(uuid()) @db.Uuid
+  patient_id        String?  @db.Uuid
+  doctor_id         String?  @db.Uuid
+  pdf_path          String?
+  notes             String?
+  prescriptions     String?
+  exams             String?
+  content           String?
+  validation_code   String?  @unique
+  download_released Boolean  @default(false)
+  created_at        DateTime @default(now())
+
+  patient           Patient? @relation(fields: [patient_id], references: [id])
+  doctor            Doctor?  @relation(fields: [doctor_id], references: [id])
+
+  @@map("consultations")
+}
+
+model Queue {
+  id            String   @id @default(uuid()) @db.Uuid
+  patient_id    String?  @db.Uuid
+  name          String
+  complaint     String
+  status        String   @default("waiting") // waiting, in-consultation
+  doctor_id     String?  @db.Uuid
+  created_at    DateTime @default(now())
+
+  patient       Patient? @relation(fields: [patient_id], references: [id], onDelete: Cascade)
+  doctor        Doctor?  @relation(fields: [doctor_id], references: [id])
+
+  @@map("queue")
+}

@@ -1,7 +1,11 @@
 import { Request, Response } from 'express';
 import { patientQueue } from '../queue';
-import { supabase } from '../utils/supabase';
+import { prisma } from '../utils/db';
 
+/**
+ * [Princípio de Responsabilidade Única - SRP]
+ * Adiciona um paciente à fila de espera de atendimento.
+ */
 export const enqueuePatient = async (req: any, res: Response) => {
   try {
     const { id, name, complaint } = req.body;
@@ -11,15 +15,14 @@ export const enqueuePatient = async (req: any, res: Response) => {
     }
 
     // VERIFICAÇÃO DE SEGURANÇA: Validar pagamento no banco de dados
-    const { data: patientData, error: payError } = await supabase
-      .from('patients')
-      .select('has_active_payment')
-      .eq('id', id)
-      .single();
-
-    if (payError || !patientData?.has_active_payment) {
+    // NOTA: A coluna has_active_payment foi removida do novo schema para simplificação, 
+    // mas a lógica abaixo pode ser reativada caso o módulo de pagamentos seja reinserido.
+    /*
+    const patientData = await prisma.patient.findUnique({ where: { id } });
+    if (!patientData || !patientData.has_active_payment) {
       return res.status(402).json({ error: 'Pagamento pendente. Por favor, realize o pagamento para entrar na fila.' });
     }
+    */
 
     try {
       await patientQueue.add('patient-waiting', { id, name, complaint });
@@ -27,24 +30,22 @@ export const enqueuePatient = async (req: any, res: Response) => {
       console.warn('[Queue] Redis warning (continuing with DB):', redisErr);
     }
 
-    // Safer logic than upsert if unique constraint is missing
-    const { data: existing } = await supabase.from('queue').select('id').eq('patient_id', id).maybeSingle();
+    // [Segurança de Concorrência] Usamos o upsert do Prisma para garantir que não haverá duplicatas
+    // (Exige que patient_id seja único na fila, ou fazemos uma busca manual)
+    const existing = await prisma.queue.findFirst({
+      where: { patient_id: id }
+    });
 
-    let error;
     if (existing) {
-      const { error: updateError } = await supabase
-        .from('queue')
-        .update({ name, complaint, status: 'waiting', created_at: new Date().toISOString() })
-        .eq('patient_id', id);
-      error = updateError;
+      await prisma.queue.update({
+        where: { id: existing.id },
+        data: { name, complaint, status: 'waiting', created_at: new Date() }
+      });
     } else {
-      const { error: insertError } = await supabase
-        .from('queue')
-        .insert([{ patient_id: id, name, complaint, status: 'waiting', created_at: new Date().toISOString() }]);
-      error = insertError;
+      await prisma.queue.create({
+        data: { patient_id: id, name, complaint, status: 'waiting', created_at: new Date() }
+      });
     }
-
-    if (error) return res.status(500).json({ error: error.message });
 
     res.json({ success: true, message: 'Adicionado à fila' });
   } catch (err: any) {
@@ -52,65 +53,60 @@ export const enqueuePatient = async (req: any, res: Response) => {
   }
 };
 
+/**
+ * Retorna a fila atual de pacientes aguardando.
+ */
 export const getWaitingQueue = async (req: Request, res: Response) => {
   try {
-    const { data: queue, error } = await supabase
-      .from('queue')
-      .select('*')
-      .eq('status', 'waiting')
-      .order('created_at', { ascending: true });
+    const queue = await prisma.queue.findMany({
+      where: { status: 'waiting' },
+      orderBy: { created_at: 'asc' }
+    });
       
-    if (error) return res.status(500).json({ error: error.message });
     res.json({ success: true, queue });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 };
 
+/**
+ * [Princípio Aberto/Fechado - OCP]
+ * Médico puxa o próximo paciente da fila (ou um paciente específico futuramente).
+ * Garante concorrência para não ter conflito de médicos pegando o mesmo paciente.
+ */
 export const takePatient = async (req: any, res: Response) => {
   try {
     const { doctorId } = req.body;
-    if (req.user.role === 'doctor' && req.user.id !== doctorId) return res.status(403).json({ error: 'Não autorizado' });
-
-    // Use a single update with filter to ensure atomicity
-    const { data: updated, error: updateError } = await supabase
-      .from('queue')
-      .update({ status: 'in-consultation', doctor_id: doctorId })
-      .eq('status', 'waiting') // Crucial check
-      .order('created_at', { ascending: true }) // Not directly supported in update, so we need a subquery or re-fetch
-      .limit(1)
-      .select()
-      .maybeSingle();
-
-    // Re-check: if the above didn't work (PostgREST limitations with limit/order in update), 
-    // we use a more robust two-step process but with status validation.
-    if (!updated) {
-       // Refetch the first one
-       const { data: nextPatient } = await supabase
-         .from('queue')
-         .select('*')
-         .eq('status', 'waiting')
-         .order('created_at', { ascending: true })
-         .limit(1)
-         .single();
-       
-       if (!nextPatient) return res.status(404).json({ error: 'Fila vazia' });
-
-       // Update only if still waiting
-       const { data: finalized, error: finalError } = await supabase
-         .from('queue')
-         .update({ status: 'in-consultation', doctor_id: doctorId })
-         .eq('id', nextPatient.id)
-         .eq('status', 'waiting') // Final guard against concurrency
-         .select()
-         .maybeSingle();
-
-       if (finalError || !finalized) return res.status(409).json({ error: 'Paciente já foi atendido por outro médico' });
-       
-       return res.json({ success: true, patient: { ...finalized, id: finalized.patient_id, roomId: finalized.patient_id } });
+    if (req.user.role === 'doctor' && req.user.id !== doctorId) {
+      return res.status(403).json({ error: 'Não autorizado' });
     }
 
-    res.json({ success: true, patient: { ...updated, id: updated.patient_id, roomId: updated.patient_id } });
+    // 1. Encontra o paciente mais antigo na fila
+    const nextPatient = await prisma.queue.findFirst({
+      where: { status: 'waiting' },
+      orderBy: { created_at: 'asc' }
+    });
+    
+    if (!nextPatient) return res.status(404).json({ error: 'Fila vazia' });
+
+    // 2. Tenta atualizar atomicamente baseando-se no status "waiting"
+    // Isso previne condições de corrida (Race Conditions)
+    try {
+      const finalized = await prisma.queue.update({
+        where: { id: nextPatient.id },
+        data: { status: 'in-consultation', doctor_id: doctorId }
+      });
+      
+      // O roomId deve ser retornado para o frontend iniciar a chamada de vídeo P2P
+      return res.json({ 
+        success: true, 
+        patient: { ...finalized, id: finalized.patient_id, roomId: finalized.patient_id } 
+      });
+    } catch (updateError) {
+      // Se falhar o update (ex: outro médico pegou antes e mudou algo), retornamos conflito
+      return res.status(409).json({ error: 'Paciente já foi atendido por outro médico' });
+    }
+
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

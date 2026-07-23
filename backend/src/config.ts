@@ -3,29 +3,25 @@ dotenv.config();
 
 function getEnv(name: string, defaultValue?: string): string {
   const value = process.env[name] || defaultValue;
-  if (!value) {
-    throw new Error(`❌ Missing environment variable: ${name}`);
+  if (value === undefined || value === null) {
+    return defaultValue !== undefined ? defaultValue : '';
   }
   return value;
 }
 
 export const config = {
-  port: parseInt(getEnv('PORT', '3001')),
-  databaseUrl: getEnv('DATABASE_URL'),
-  supabaseUrl: getEnv('SUPABASE_URL'),
-  supabaseKey: getEnv('SUPABASE_KEY'),
-  jwtSecret: getEnv('JWT_SECRET'),
-  adminPassword: getEnv('ADMIN_PASSWORD', 'admin123'),
-  dailyApiKey: getEnv('DAILY_API_KEY'),
-  dailyDomain: getEnv('DAILY_DOMAIN', 'ferreirafxdev'),
+  port: parseInt(process.env.PORT || '3001', 10),
+  databaseUrl: process.env.DATABASE_URL || '',
+  jwtSecret: process.env.JWT_SECRET || 'supersecretjwt',
+  adminPassword: process.env.ADMIN_PASSWORD || 'admin123',
   s3: {
-    endpoint: getEnv('S3_ENDPOINT'),
-    region: getEnv('S3_REGION', 'us-east-1'),
-    accessKey: getEnv('S3_ACCESS_KEY'),
-    secretKey: getEnv('S3_SECRET_KEY'),
-    bucket: getEnv('S3_BUCKET', 's3'),
+    endpoint: process.env.S3_ENDPOINT || '',
+    region: process.env.S3_REGION || 'auto',
+    accessKey: process.env.S3_ACCESS_KEY || '',
+    secretKey: process.env.S3_SECRET_KEY || '',
+    bucket: process.env.S3_BUCKET || 'medpronto-bucket',
   },
-  corsOrigin: getEnv('CORS_ORIGIN', 'http://localhost:5173'),
+  corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   redis: {
     url: process.env.REDIS_URL || 'redis://localhost:6379',
   }

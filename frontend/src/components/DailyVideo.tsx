@@ -1,73 +1,31 @@
-import React, { useEffect, useRef, useState } from 'react';
-import DailyIframe from '@daily-co/daily-js';
-import { Camera, Mic, PhoneOff, Monitor, Settings } from 'lucide-react';
+import React from 'react';
+import WebRTCVideo from './WebRTCVideo';
 
 interface DailyVideoProps {
-  roomUrl: string;
+  roomUrl?: string;
   token?: string;
+  roomId?: string;
+  role?: 'doctor' | 'patient';
+  userName?: string;
   onLeave?: () => void;
 }
 
-const DailyVideo: React.FC<DailyVideoProps> = ({ roomUrl, token, onLeave }) => {
-  const videoContainerRef = useRef<HTMLDivElement>(null);
-  const [callObject, setCallObject] = useState<any>(null);
-
-  useEffect(() => {
-    if (!videoContainerRef.current) return;
-
-    // Destroy existing instance if any
-    if (callObject) {
-      callObject.destroy();
-    }
-
-    // Initialize Daily Prebuilt
-    const callFrame = DailyIframe.createFrame(videoContainerRef.current, {
-      iframeStyle: {
-        width: '100%',
-        height: '100%',
-        border: '0',
-        borderRadius: '1.5rem',
-      },
-      showLeaveButton: true,
-      showFullscreenButton: true,
-    });
-
-    setCallObject(callFrame);
-
-    // Join the room
-    callFrame.join({ url: roomUrl, token });
-
-    // Event listeners
-    callFrame.on('left-meeting', () => {
-      if (onLeave) onLeave();
-    });
-
-    return () => {
-      callFrame.destroy();
-    };
-  }, [roomUrl, token]);
+/**
+ * Componente Wrapper para manter retrocompatibilidade e redirecionar para WebRTCVideo Nativo
+ */
+const DailyVideo: React.FC<DailyVideoProps> = ({ roomUrl, roomId, role = 'patient', userName, onLeave }) => {
+  // Extrai roomId do roomUrl se não tiver passado explicitamente
+  const effectiveRoomId = roomId || roomUrl?.split('/').pop() || 'sala-consulta';
 
   return (
-    <div 
-      ref={videoContainerRef} 
-      style={{ 
-        width: '100%', 
-        height: '100%', 
-        minHeight: '300px', 
-        backgroundColor: '#000',
-        borderRadius: '1.5rem',
-        overflow: 'hidden',
-        position: 'relative'
-      }} 
-    >
-        {/* Placeholder if loading or no video */}
-        {!roomUrl && (
-            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8' }}>
-                Conectando ao Daily.co...
-            </div>
-        )}
-    </div>
+    <WebRTCVideo 
+      roomId={effectiveRoomId} 
+      role={role} 
+      userName={userName}
+      onLeave={onLeave} 
+    />
   );
 };
 
 export default DailyVideo;
+

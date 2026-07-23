@@ -1,19 +1,19 @@
-import { useEffect, useRef } from 'react';
-import { StreamManager } from 'openvidu-browser';
+import React, { useRef, useEffect } from 'react';
 
 interface Props {
-  streamManager: StreamManager;
+  stream?: MediaStream | null;
   isMain?: boolean;
+  label?: string;
 }
 
-const VideoComponent = ({ streamManager, isMain }: Props) => {
+const VideoComponent: React.FC<Props> = ({ stream, isMain, label }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    if (streamManager && videoRef.current) {
-      streamManager.addVideoElement(videoRef.current);
+    if (videoRef.current && stream) {
+      videoRef.current.srcObject = stream;
     }
-  }, [streamManager]);
+  }, [stream]);
 
   return (
     <div style={{ 
@@ -32,25 +32,26 @@ const VideoComponent = ({ streamManager, isMain }: Props) => {
         style={{ 
           width: '100%', 
           height: '100%', 
-          objectFit: 'cover', // This handles the "enquadramento" by filling the container
-          transform: streamManager.remote ? 'none' : 'scaleX(-1)' // Mirror local video
+          objectFit: 'cover'
         }}
       />
-      <div style={{ 
-        position: 'absolute', 
-        bottom: '1rem', 
-        left: '1rem', 
-        background: 'rgba(0,0,0,0.5)', 
-        color: 'white', 
-        padding: '0.25rem 0.75rem', 
-        borderRadius: '2rem', 
-        fontSize: '0.7rem',
-        fontWeight: 600,
-        backdropFilter: 'blur(4px)',
-        border: '1px solid rgba(255,255,255,0.1)'
-      }}>
-        {JSON.parse(streamManager.stream.connection.data).clientData}
-      </div>
+      {label && (
+        <div style={{ 
+          position: 'absolute', 
+          bottom: '1rem', 
+          left: '1rem', 
+          background: 'rgba(0,0,0,0.5)', 
+          color: 'white', 
+          padding: '0.25rem 0.75rem', 
+          borderRadius: '2rem', 
+          fontSize: '0.7rem',
+          fontWeight: 600,
+          backdropFilter: 'blur(4px)',
+          border: '1px solid rgba(255,255,255,0.1)'
+        }}>
+          {label}
+        </div>
+      )}
     </div>
   );
 };

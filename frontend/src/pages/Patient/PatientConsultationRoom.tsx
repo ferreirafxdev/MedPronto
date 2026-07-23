@@ -14,24 +14,9 @@ const PatientConsultationRoom = () => {
   const { user } = useStore();
   const navigate = useNavigate();
   const [status, setStatus] = useState<'active' | 'ended'>('active');
-  const [dailyConfig, setDailyConfig] = useState<{url: string, token: string} | null>(null);
   const [doctorName, setDoctorName] = useState('Médico');
 
   useEffect(() => {
-    // Busca as credenciais do Daily.co
-    const fetchDailyToken = async () => {
-      try {
-        const res = await apiClient.post('/api/daily/token', {
-          room: roomId,
-          username: user?.name || 'Paciente',
-          isDoctor: false
-        });
-        setDailyConfig({ url: res.data.url, token: res.data.token });
-      } catch (err) {
-        console.error("Erro ao obter token do Daily.co", err);
-      }
-    };
-    
     const fetchInitialDoctorName = async () => {
       try {
         const r = await apiClient.get(`/api/patient/check-queue/${user?.id}`);
@@ -42,7 +27,6 @@ const PatientConsultationRoom = () => {
     };
     
     if (user && roomId) {
-       fetchDailyToken();
        fetchInitialDoctorName();
     }
   }, [roomId, user]);
@@ -105,10 +89,10 @@ const PatientConsultationRoom = () => {
         overflow: 'hidden', fontFamily: '"Inter", sans-serif' 
     }}>
       
-      {/* Componente de Vídeo Daily.co */}
+      {/* Componente de Vídeo WebRTC Nativo */}
       <div style={{ width: '100%', height: '100%' }}>
-         {dailyConfig ? (
-             <DailyVideo roomUrl={dailyConfig.url} token={dailyConfig.token} />
+         {roomId ? (
+             <DailyVideo roomId={roomId} role="patient" userName={user?.name || 'Paciente'} onLeave={() => navigate('/patient/dashboard')} />
          ) : (
              <div style={{ color: 'white', display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center' }}>Carregando sala de vídeo...</div>
          )}

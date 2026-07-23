@@ -73,8 +73,16 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Não encontrado' }); 
 });
 
+import { createServer } from 'http';
+import { initializeWebSocket } from './websocket';
+
 // Inicialização do servidor
 const PORT = config.port || 3001;
-app.listen(PORT, () => { 
+const httpServer = createServer(app);
+
+// Inicializa o Socket.io
+initializeWebSocket(httpServer);
+
+httpServer.listen(PORT, () => { 
   console.log(`🚀 MedPronto API rodando na porta ${PORT}`); 
 });
