@@ -17,30 +17,6 @@ services:
     networks:
       - medpronto-network
 
-  backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    container_name: medpronto-backend
-    environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-admin123}@postgres:5432/${POSTGRES_DB:-medpronto}?schema=public
-      - REDIS_URL=${REDIS_URL}
-      - JWT_SECRET=${JWT_SECRET}
-      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
-      - S3_ENDPOINT=${S3_ENDPOINT}
-      - S3_REGION=${S3_REGION:-enam}
-      - S3_ACCESS_KEY=${S3_ACCESS_KEY}
-      - S3_SECRET_KEY=${S3_SECRET_KEY}
-      - S3_BUCKET=${S3_BUCKET:-prontuarios}
-      - CORS_ORIGIN=${CORS_ORIGIN:-*}
-    ports:
-      - "3001:3001"
-    depends_on:
-      - postgres
-    restart: unless-stopped
-    networks:
-      - medpronto-network
-
   coturn:
     image: coturn/coturn
     container_name: medpronto-coturn
