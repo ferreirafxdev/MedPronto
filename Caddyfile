@@ -1,0 +1,22 @@
+{
+    email ${ACME_EMAIL:-admin@medpronto.com.br}
+}
+
+# Suporta acesso por Domínio, sslip.io (com HTTPS Let's Encrypt) ou IP Direto
+{$DOMAIN_NAME:-localhost} {
+    handle /api/* {
+        reverse_proxy backend:3001
+    }
+
+    handle /socket.io/* {
+        reverse_proxy backend:3001
+    }
+
+    handle /uploads/* {
+        reverse_proxy backend:3001
+    }
+
+    handle {
+        reverse_proxy frontend:80
+    }
+}

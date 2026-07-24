@@ -65,7 +65,44 @@ npm run dev
 ```
 *(A aplicação frontend abrirá na URL: http://localhost:5173).*
 
-## Banco de Dados / APIs Externas Configurados
-Foram integrados no `/server/src/index.ts`:
-- A URl do **Supabase** (`https://xxddjacfiammzddgozxv.supabase.co`) e recursos de bucket S3 em us-west-2 para prontuários em `.pdf` finalizados.
-- O link do **Redis (Upstash)** seguro por certificado SSL (`redis-cli --tls -u redis://default:gQAAAAAAAQvo...`) utilizado inteiramente para Gestão de Fila do pronto socorro.
+## Como Iniciar em Produção (Deploy 100% Self-Hosted na VPS)
+
+Todo o ecossistema roda dentro de contêineres Docker isolados e otimizados:
+
+1. Clone o repositório na sua VPS (Ubuntu/Debian):
+```bash
+git clone <url-do-repositorio>
+cd Saas
+```
+
+2. Crie o arquivo `.env` com base no exemplo:
+```bash
+cp .env.production.example .env
+nano .env
+```
+> 💡 **Não tem um domínio pago? Sem problemas!**
+> Você pode usar o serviço **gratuito e automático** `sslip.io`:
+> Se o IP da sua VPS for `191.252.100.50`, defina no seu `.env`:
+> - `DOMAIN_NAME=191.252.100.50.sslip.io`
+> - `VITE_API_URL=https://191.252.100.50.sslip.io`
+> - `CORS_ORIGIN=https://191.252.100.50.sslip.io`
+> 
+> *Isso gera um domínio válido apontando para seu IP e permite que o Caddy emita um certificado **HTTPS/SSL 100% Gratuito**, garantindo que as permissões de Câmera e Microfone do WebRTC funcionem no navegador sem nenhum bloqueio de segurança!*
+
+
+3. Suba todos os serviços em segundo plano:
+```bash
+docker compose up -d --build
+```
+
+4. Execute as migrações do banco de dados no contêiner do Backend:
+```bash
+docker compose exec backend npx prisma db push
+```
+
+## Arquitetura 100% Self-Hosted (Sem custos com SaaS externos)
+- **Banco de Dados**: PostgreSQL 15 rodando em contêiner Docker com volume persistente para prontuários, usuários e atestados.
+- **Fila & WebSocket**: Redis 7 local gerenciando a fila do Pronto Socorro (BullMQ) e troca de mensagens.
+- **Prontuários & PDFs**: Salvos diretamente no volume persistente Docker (`/app/uploads`), servidos com segurança via API Node.js.
+- **WebRTC Vídeo**: Servidor Coturn (STUN/TURN) nativo integrado para passagem de vídeo P2P com baixíssima latência e custo zero.
+

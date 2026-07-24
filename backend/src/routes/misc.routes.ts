@@ -1,14 +1,13 @@
+import fs from 'fs';
+import path from 'path';
 import { Router } from 'express';
 import { prisma } from '../utils/db';
 import { authenticateToken } from '../middleware/auth.middleware';
-import { s3Client } from '../utils/s3';
-import { GetObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { config } from '../config';
 
 /**
  * Rotas Diversas e Serviços Auxiliares
- * Refatorado para utilizar Prisma ORM e Cloudflare R2 / S3 Nativo
+ * Refatorado para utilizar Prisma ORM e armazenamento local Self-Hosted (VPS Docker)
  */
 const router = Router();
 
@@ -43,7 +42,7 @@ router.post('/payment/confirm', authenticateToken, async (req: any, res) => {
   }
 });
 
-// Gerar URL assinada para download de documentos (Cloudflare R2 / S3)
+// Gerar URL de acesso/download de documentos (Armazenamento Local VPS Docker)
 router.post('/documents/signed-url', authenticateToken, async (req: any, res) => {
   try {
     const { key } = req.body;
@@ -52,19 +51,16 @@ router.post('/documents/signed-url', authenticateToken, async (req: any, res) =>
       return res.status(400).json({ error: 'Chave do documento é obrigatória.' });
     }
 
-    const command = new GetObjectCommand({
-      Bucket: config.s3.bucket,
-      Key: key,
-    });
-
-    const url = await getSignedUrl(s3Client, command, { expiresIn: 3600 }); // Validade 1 hora
+    // Retorna a URL direta estática do arquivo salvo no servidor
+    const url = `/uploads/${key}`;
     
     res.json({ success: true, url });
   } catch (err: any) {
-    console.error('Erro ao gerar URL assinada:', err);
-    res.status(500).json({ error: 'Erro ao gerar URL do documento.' });
+    console.error('Erro ao buscar URL do documento:', err);
+    res.status(500).json({ error: 'Erro ao buscar URL do documento.' });
   }
 });
+
 
 // Acesso do médico aos dados e histórico do paciente durante a consulta
 router.get('/doctor/patient/:patientId/record', authenticateToken, async (req: any, res) => {

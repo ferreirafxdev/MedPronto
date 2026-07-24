@@ -1,52 +1,135 @@
 version: '3.8'
 
 services:
+  # 1. Banco de Dados PostgreSQL (Prontuários, Usuários, Consultas e Atestados)
   postgres:
     image: postgres:15-alpine
+    container_name: medpronto_postgres
+    restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-admin}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin123}
       POSTGRES_DB: ${POSTGRES_DB:-medpronto}
-    ports:
-      - target: 5432
-        published: 5432
-        protocol: tcp
-        mode: host
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    deploy:
-      restart_policy:
-        condition: on-failure
+    networks:
+      - medpronto_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin} -d ${POSTGRES_DB:-medpronto}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
+  # 2. Cache e Fila de Atendimento em Tempo Real (BullMQ + Socket.io)
+  redis:
+    image: redis:7-alpine
+    container_name: medpronto_redis
+    restart: always
+    volumes:
+      - redis_data:/data
+    networks:
+      - medpronto_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 3. Servidor WebRTC Coturn (STUN/TURN Self-Hosted Gratuito)
   coturn:
     image: coturn/coturn
+    container_name: medpronto_coturn
+    restart: always
+    network_mode: host
     command: >
-      --log-file=stdout --listening-port=3478 --tls-listening-port=5349 --listening-ip=0.0.0.0 --relay-ip=0.0.0.0 --external-ip=$COTURN_EXTERNAL_IP --min-port=49152 --max-port=65535 --realm=$COTURN_REALM --user=$COTURN_USER:$COTURN_PASSWORD
+      --log-file=stdout 
+      --listening-port=3478 
+      --tls-listening-port=5349 
+      --listening-ip=0.0.0.0 
+      --relay-ip=${COTURN_EXTERNAL_IP:-127.0.0.1} 
+      --external-ip=${COTURN_EXTERNAL_IP:-127.0.0.1} 
+      --min-port=49152 
+      --max-port=65535 
+      --realm=${COTURN_REALM:-medpronto.local} 
+      --user=${COTURN_USER:-user}:${COTURN_PASSWORD:-password}
     environment:
       - COTURN_EXTERNAL_IP=${COTURN_EXTERNAL_IP:-127.0.0.1}
       - COTURN_REALM=${COTURN_REALM:-medpronto.local}
       - COTURN_USER=${COTURN_USER:-user}
       - COTURN_PASSWORD=${COTURN_PASSWORD:-password}
+
+  # 4. Backend (API Node.js + WebSocket Socket.io + Worker PDF)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: medpronto_backend
+    restart: always
+    environment:
+      PORT: 3001
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-admin123}@postgres:5432/${POSTGRES_DB:-medpronto}?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-supersecretmedpronto2026}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      UPLOADS_DIR: /app/uploads
+    volumes:
+      - uploads_data:/app/uploads
+    networks:
+      - medpronto_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # 5. Frontend (React Vite + Nginx)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost}
+        VITE_TURN_SERVER: ${VITE_TURN_SERVER:-turn:127.0.0.1:3478}
+        VITE_TURN_USERNAME: ${COTURN_USER:-user}
+        VITE_TURN_PASSWORD: ${COTURN_PASSWORD:-password}
+    container_name: medpronto_frontend
+    restart: always
+    networks:
+      - medpronto_network
+    depends_on:
+      - backend
+
+  # 6. Gateway HTTPS SSL Automático (Caddy)
+  caddy:
+    image: caddy:2-alpine
+    container_name: medpronto_caddy
+    restart: always
     ports:
-      - target: 3478
-        published: 3478
-        protocol: tcp
-        mode: host
-      - target: 3478
-        published: 3478
-        protocol: udp
-        mode: host
-      - target: 5349
-        published: 5349
-        protocol: tcp
-        mode: host
-      - target: 5349
-        published: 5349
-        protocol: udp
-        mode: host
-    deploy:
-      restart_policy:
-        condition: on-failure
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN_NAME: ${DOMAIN_NAME:-localhost}
+      ACME_EMAIL: ${ACME_EMAIL:-admin@medpronto.com.br}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - medpronto_network
+    depends_on:
+      - frontend
+      - backend
+
+networks:
+  medpronto_network:
+    driver: bridge
 
 volumes:
   postgres_data:
+  redis_data:
+  uploads_data:
+  caddy_data:
+  caddy_config:

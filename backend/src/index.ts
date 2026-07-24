@@ -5,6 +5,7 @@ import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import dns from 'dns';
 import morgan from 'morgan';
+import path from 'path';
 import { config } from './config';
 
 // Importação das rotas modulares
@@ -34,6 +35,11 @@ app.use(cors(corsOptions));
  // Controle de acesso
 app.set('trust proxy', 1); // Necessário para rate limiting atrás de proxies como Vercel/Cloudflare
 app.use(express.json()); // Parser para JSON no corpo das requisições
+
+// Serve arquivos de prontuários, atestados e receitas gerados localmente em /uploads
+const uploadsDir = process.env.UPLOADS_DIR || path.join(process.cwd(), 'uploads');
+app.use('/uploads', express.static(uploadsDir));
+
 
 // -- Coletor de Logs em Memória (Para exibição no Painel Admin) --
 export const serverLogs: string[] = []; // Buffer de logs

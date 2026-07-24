@@ -1,5 +1,27 @@
+# Dependências e Builds
 node_modules/
+**/node_modules/
 dist/
+**/dist/
+
+# Variáveis de ambiente sensíveis
 .env
 .env.local
+.env.production
+!.env.production.example
+
+# Dados de uploads locais e logs
+uploads/
+**/uploads/
+*.log
+scratch/
+
+# Caddy e SSL
+caddy_data/
+caddy_config/
+
+# Sistema Operacional e IDE
 .DS_Store
+Thumbs.db
+.vscode/
+.idea/
