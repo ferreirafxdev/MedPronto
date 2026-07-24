@@ -440,4 +440,5 @@ const WebRTCVideo: React.FC<WebRTCVideoProps> = ({ roomId, role, userName, onLea
   );
 };
 
-export default WebRTCVideo;
+export default React.memo(WebRTCVideo);
+

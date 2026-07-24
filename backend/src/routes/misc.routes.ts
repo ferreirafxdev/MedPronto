@@ -79,7 +79,7 @@ router.get('/doctor/patient/:patientId/record', authenticateToken, async (req: a
       return res.status(404).json({ error: 'Paciente não encontrado' });
     }
 
-    const [consultations, atestados] = await Promise.all([
+    const [consultations, atestados, queueItem] = await Promise.all([
       prisma.consultation.findMany({
         where: { patient_id: patientId },
         include: { doctor: { select: { name: true, crm: true } } },
@@ -88,6 +88,10 @@ router.get('/doctor/patient/:patientId/record', authenticateToken, async (req: a
       prisma.atestado.findMany({
         where: { patient_id: patientId },
         include: { doctor: { select: { name: true, crm: true } } },
+        orderBy: { created_at: 'desc' }
+      }),
+      prisma.queue.findFirst({
+        where: { patient_id: patientId },
         orderBy: { created_at: 'desc' }
       })
     ]);
@@ -107,6 +111,7 @@ router.get('/doctor/patient/:patientId/record', authenticateToken, async (req: a
     res.json({
       success: true,
       patient,
+      queueItem,
       record: { 
         consultations: formattedConsultations, 
         atestados: formattedAtestados 
@@ -116,5 +121,6 @@ router.get('/doctor/patient/:patientId/record', authenticateToken, async (req: a
     res.status(500).json({ error: err.message });
   }
 });
+
 
 export default router;
