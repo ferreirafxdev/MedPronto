@@ -104,9 +104,14 @@ export const endConsultation = async (req: Request, res: Response) => {
       where: { patient_id: patientId }
     });
     
-    // (A atualização de has_active_payment foi removida pois não constava no novo Schema)
+    // Consome o pagamento do paciente (exige um novo pagamento para realizar outra consulta)
+    await prisma.patient.update({
+      where: { id: patientId },
+      data: { has_active_payment: false }
+    });
 
     res.json({ success: true, message: 'Finalizado' });
+
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

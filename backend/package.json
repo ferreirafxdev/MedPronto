@@ -1,7 +1,7 @@
 {
   "name": "server",
   "version": "1.0.0",
-  "description": "MedPronto API - Supabase Edition",
+  "description": "MedPronto API - PostgreSQL Self-Hosted Edition",
   "main": "index.js",
   "scripts": {
     "dev": "ts-node-dev src/index.ts",
@@ -14,8 +14,8 @@
     "@aws-sdk/s3-request-presigner": "^3.1032.0",
     "@bull-board/api": "^7.0.0",
     "@bull-board/express": "^7.0.0",
-    "@supabase/supabase-js": "^2.100.1",
     "@types/morgan": "^1.9.10",
+
     "axios": "^1.15.0",
     "bcryptjs": "^3.0.3",
     "bullmq": "^5.76.4",

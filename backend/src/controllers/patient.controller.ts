@@ -19,10 +19,11 @@ export const registerPatient = async (req: Request, res: Response) => {
           cpf,
           age,
           email,
-          birth_date: birthDate
-          // has_active_payment não consta no novo schema
+          birth_date: birthDate,
+          has_active_payment: true
         }
       });
+
 
       // Gera token de acesso para o paciente
       const token = jwt.sign(

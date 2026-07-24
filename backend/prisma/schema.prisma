@@ -8,13 +8,14 @@ datasource db {
 }
 
 model Patient {
-  id            String    @id @default(uuid()) @db.Uuid
-  name          String
-  cpf           String    @unique
-  age           String?
-  email         String?
-  birth_date    String?
-  created_at    DateTime  @default(now())
+  id                 String    @id @default(uuid()) @db.Uuid
+  name               String
+  cpf                String    @unique
+  age                String?
+  email              String?
+  birth_date         String?
+  has_active_payment Boolean   @default(false)
+  created_at         DateTime  @default(now())
   
   atestados     Atestado[]
   consultations Consultation[]
@@ -22,6 +23,7 @@ model Patient {
 
   @@map("patients")
 }
+
 
 model Doctor {
   id            String    @id @default(uuid()) @db.Uuid

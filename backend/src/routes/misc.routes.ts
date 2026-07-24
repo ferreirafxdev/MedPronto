@@ -35,12 +35,18 @@ router.post('/payment/confirm', authenticateToken, async (req: any, res) => {
       return res.status(403).json({ error: 'Não autorizado' });
     }
 
-    // Registra a confirmação no sistema
+    // Registra a ativação do pagamento no banco PostgreSQL via Prisma
+    await prisma.patient.update({
+      where: { id: patientId },
+      data: { has_active_payment: true }
+    });
+
     res.json({ success: true, message: 'Pagamento confirmado e registrado no banco.' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // Gerar URL de acesso/download de documentos (Armazenamento Local VPS Docker)
 router.post('/documents/signed-url', authenticateToken, async (req: any, res) => {

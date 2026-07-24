@@ -19,7 +19,8 @@ O sistema é dividido em duas partes principais:
    - Fila em tempo real gerenciada pelo Redis (Upstash) sob as rotas de API `/api/enqueue` e `/api/take-patient`.
    - Geração de PDF dinâmica no encerramento da consulta utilizando o `pdfkit`.
    - Comunicação real-time via `Socket.io` garantindo que o painel do médico e do paciente sincronizem no momento do atendimento.
-   - Upload de Prontuários (PDF) diretamente para o Supabase Storage via S3 API ou Supabase SDK.
+   - Upload e armazenamento de Prontuários (PDF) salvos diretamente no volume persistente do servidor e indexados via PostgreSQL.
+
 
 ## Estrutura de Diretórios
 

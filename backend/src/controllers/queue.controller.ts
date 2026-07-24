@@ -14,15 +14,18 @@ export const enqueuePatient = async (req: any, res: Response) => {
       return res.status(403).json({ error: 'Não autorizado' });
     }
 
-    // VERIFICAÇÃO DE SEGURANÇA: Validar pagamento no banco de dados
-    // NOTA: A coluna has_active_payment foi removida do novo schema para simplificação, 
-    // mas a lógica abaixo pode ser reativada caso o módulo de pagamentos seja reinserido.
-    /*
+    // VERIFICAÇÃO DE SEGURANÇA: Validar pagamento no banco de dados PostgreSQL
     const patientData = await prisma.patient.findUnique({ where: { id } });
-    if (!patientData || !patientData.has_active_payment) {
-      return res.status(402).json({ error: 'Pagamento pendente. Por favor, realize o pagamento para entrar na fila.' });
+    if (!patientData) {
+      return res.status(404).json({ error: 'Paciente não encontrado' });
     }
-    */
+
+    if (!patientData.has_active_payment) {
+      return res.status(402).json({ 
+        error: 'Pagamento pendente. Seu atendimento anterior já foi finalizado. Para entrar na fila novamente, realize um novo pagamento.',
+        requiresPayment: true 
+      });
+    }
 
     try {
       await patientQueue.add('patient-waiting', { id, name, complaint });
@@ -30,8 +33,7 @@ export const enqueuePatient = async (req: any, res: Response) => {
       console.warn('[Queue] Redis warning (continuing with DB):', redisErr);
     }
 
-    // [Segurança de Concorrência] Usamos o upsert do Prisma para garantir que não haverá duplicatas
-    // (Exige que patient_id seja único na fila, ou fazemos uma busca manual)
+    // Usamos busca e atualização no banco Postgres
     const existing = await prisma.queue.findFirst({
       where: { patient_id: id }
     });
@@ -52,6 +54,7 @@ export const enqueuePatient = async (req: any, res: Response) => {
     res.status(500).json({ error: err.message });
   }
 };
+
 
 /**
  * Retorna a fila atual de pacientes aguardando.
