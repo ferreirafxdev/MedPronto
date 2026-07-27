@@ -35,28 +35,15 @@ services:
       timeout: 5s
       retries: 5
 
-  # 3. Servidor WebRTC Coturn (STUN/TURN Self-Hosted Gratuito)
-  coturn:
-    image: coturn/coturn
-    container_name: medpronto_coturn
-    restart: always
-    network_mode: host
-    command: >
-      --log-file=stdout 
-      --listening-port=3478 
-      --tls-listening-port=5349 
-      --listening-ip=0.0.0.0 
-      --relay-ip=${COTURN_EXTERNAL_IP:-127.0.0.1} 
-      --external-ip=${COTURN_EXTERNAL_IP:-127.0.0.1} 
-      --min-port=49152 
-      --max-port=65535 
-      --realm=${COTURN_REALM:-medpronto.local} 
-      --user=${COTURN_USER:-user}:${COTURN_PASSWORD:-password}
-    environment:
-      - COTURN_EXTERNAL_IP=${COTURN_EXTERNAL_IP:-127.0.0.1}
-      - COTURN_REALM=${COTURN_REALM:-medpronto.local}
-      - COTURN_USER=${COTURN_USER:-user}
-      - COTURN_PASSWORD=${COTURN_PASSWORD:-password}
+  # 3. Servidor WebRTC (Utilizando LiveKit Cloud gerenciado)
+  # livekit:
+  #   image: livekit/livekit-server:latest
+  #   container_name: medpronto_livekit
+  #   restart: always
+  #   ports:
+  #     - "7880:7880"
+  #     - "7881:7881"
+  #     - "50000-60000:50000-60000/udp"
 
   # 4. Backend (API Node.js + WebSocket Socket.io + Worker PDF)
   backend:
@@ -74,6 +61,9 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
       UPLOADS_DIR: /app/uploads
+      LIVEKIT_URL: ${LIVEKIT_URL:-ws://livekit:7880}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-devkey}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-secretsecretsecretsecretsecretsecret}
     volumes:
       - uploads_data:/app/uploads
     networks:
@@ -91,9 +81,7 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_URL: ${VITE_API_URL:-http://localhost}
-        VITE_TURN_SERVER: ${VITE_TURN_SERVER:-turn:127.0.0.1:3478}
-        VITE_TURN_USERNAME: ${COTURN_USER:-user}
-        VITE_TURN_PASSWORD: ${COTURN_PASSWORD:-password}
+        VITE_LIVEKIT_URL: ${VITE_LIVEKIT_URL:-ws://localhost:7880}
     container_name: medpronto_frontend
     restart: always
     networks:

@@ -34,6 +34,9 @@ const PatientDashboard = () => {
         setConsultationReady(true);
         setDoctorName(resp.data.doctorName || 'Médico');
         setLoading(false);
+        // Redirecionamento automático End-to-End para a sala de vídeochamada
+        setConsultationRoomId(user.id);
+        navigate(`/patient/consultation/${user.id}`, { replace: true });
       } else if (resp.data.inQueue) {
         setInQueue(true);
         setConsultationReady(false);
@@ -54,7 +57,7 @@ const PatientDashboard = () => {
     } catch (e) {
       setLoading(false);
     }
-  }, [user, searchParams, navigate]);
+  }, [user, searchParams, navigate, setConsultationRoomId]);
 
   useEffect(() => {
     if (!user) {
@@ -62,7 +65,8 @@ const PatientDashboard = () => {
       return;
     }
     checkStatus();
-    const interval = setInterval(checkStatus, 8000);
+    // Polling rápido de 3 segundos para transição imediata assim que o médico chama
+    const interval = setInterval(checkStatus, 3000);
     return () => clearInterval(interval);
   }, [user, navigate, checkStatus]);
 
@@ -287,33 +291,30 @@ const PatientDashboard = () => {
           </div>
         )}
 
-        {/* Estado 3: Médico Pronto para Atender! */}
+        {/* Estado 3: Transição Automática End-to-End para a Consulta */}
         {consultationReady && (
           <div style={{
-            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(6, 78, 59, 0.3))',
+            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(6, 78, 59, 0.4))',
             borderRadius: '1.5rem',
             padding: '2rem 1.5rem',
             border: '2px solid #10b981',
             marginBottom: '1.5rem',
             textAlign: 'center',
-            boxShadow: '0 20px 30px rgba(16, 185, 129, 0.25)',
+            boxShadow: '0 20px 30px rgba(16, 185, 129, 0.3)',
             animation: 'fadeIn 0.4s ease'
           }}>
-            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem', color: 'white', boxShadow: '0 0 20px #10b981' }}>
+            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem', color: 'white', boxShadow: '0 0 25px #10b981' }}>
               <UserCheck size={36} />
             </div>
 
             <h3 style={{ fontSize: '1.5rem', margin: 0, fontWeight: 900, color: 'white' }}>O Médico Chamou Você!</h3>
             <p style={{ color: '#a7f3d0', fontSize: '0.95rem', marginTop: '0.5rem' }}>
-              Dr(a). {doctorName} está te aguardando na sala de vídeochamada.
+              Dr(a). {doctorName} iniciou seu atendimento. Entrando na vídeochamada ao vivo...
             </p>
 
-            <button 
-              onClick={enterRoom} 
-              className="btn-success-action"
-            >
-              <Video size={22} /> ENTRAR NA SALA DE CONSULTA
-            </button>
+            <div style={{ marginTop: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.6rem', color: '#10b981', fontWeight: 700, fontSize: '0.9rem' }}>
+              <Loader2 size={20} className="animate-spin" /> Conectando à sala de consulta...
+            </div>
           </div>
         )}
 

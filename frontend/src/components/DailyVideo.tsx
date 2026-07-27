@@ -1,5 +1,5 @@
 import React from 'react';
-import WebRTCVideo from './WebRTCVideo';
+import LiveKitVideo from './LiveKitVideo';
 
 interface DailyVideoProps {
   roomUrl?: string;
@@ -11,14 +11,14 @@ interface DailyVideoProps {
 }
 
 /**
- * Componente Wrapper para manter retrocompatibilidade e redirecionar para WebRTCVideo Nativo
+ * Componente Wrapper para manter retrocompatibilidade e direcionar para o LiveKitVideo (SFU)
  */
 const DailyVideo: React.FC<DailyVideoProps> = ({ roomUrl, roomId, role = 'patient', userName, onLeave }) => {
   // Extrai roomId do roomUrl se não tiver passado explicitamente
   const effectiveRoomId = roomId || roomUrl?.split('/').pop() || 'sala-consulta';
 
   return (
-    <WebRTCVideo 
+    <LiveKitVideo 
       roomId={effectiveRoomId} 
       role={role} 
       userName={userName}

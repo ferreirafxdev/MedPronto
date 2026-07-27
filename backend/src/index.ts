@@ -15,6 +15,7 @@ import doctorRoutes from './routes/doctor.routes';
 import adminRoutes from './routes/admin.routes';
 import queueRoutes from './routes/queue.routes';
 import miscRoutes from './routes/misc.routes';
+import livekitRoutes from './routes/livekit.routes';
 
 // Correção para problemas de conexão IPv6 em alguns ambientes (ex: Supabase/Postgres)
 dns.setDefaultResultOrder('ipv4first');
@@ -25,7 +26,7 @@ const app = express();
 // -- Middleware de Segurança e CORS --
 app.use(helmet({ contentSecurityPolicy: false })); // Proteção de headers HTTP
 const corsOptions = {
-  origin: true, // Reflete a origem de quem está chamando (para suportar credentials em multi-domínios)
+  origin: (origin: any, callback: any) => callback(null, true), // Libera conexões WebRTC e API de qualquer IP externo ou origem
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With']
@@ -72,6 +73,7 @@ app.use('/api/patient', patientRoutes); // Fluxo de dados do paciente e históri
 app.use('/api', doctorRoutes);      // Fluxo médico (Atestados, Finalização de consulta)
 app.use('/api/admin', adminRoutes);   // Gestão de infraestrutura, médicos e prontuários
 app.use('/api', queueRoutes);       // Gestão de fila em tempo real (Redis)
+app.use('/api/livekit', livekitRoutes); // Salas de Telemedicina com LiveKit SFU
 app.use('/api', miscRoutes);        // Utilitários diversos
 
 // Handler para rotas não encontradas (404)
@@ -81,6 +83,7 @@ app.use((req, res) => {
 
 import { createServer } from 'http';
 import { initializeWebSocket } from './websocket';
+import { syncDatabaseSchema } from './utils/db';
 
 // Inicialização do servidor
 const PORT = config.port || 3001;
@@ -89,6 +92,8 @@ const httpServer = createServer(app);
 // Inicializa o Socket.io
 initializeWebSocket(httpServer);
 
-httpServer.listen(PORT, () => { 
+httpServer.listen(PORT, async () => { 
   console.log(`🚀 MedPronto API rodando na porta ${PORT}`); 
+  await syncDatabaseSchema();
 });
+

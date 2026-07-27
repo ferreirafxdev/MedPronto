@@ -24,5 +24,10 @@ export const config = {
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   redis: {
     url: process.env.REDIS_URL || 'redis://localhost:6379',
+  },
+  livekit: {
+    url: process.env.LIVEKIT_URL || 'ws://localhost:7880',
+    apiKey: process.env.LIVEKIT_API_KEY || 'devkey',
+    apiSecret: process.env.LIVEKIT_API_SECRET || 'secretsecretsecretsecretsecretsecret',
   }
 };
