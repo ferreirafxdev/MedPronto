@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import apiClient from '../../api/client';
 import { ShieldCheck, HeartPulse, FileText, ClipboardList, Download, CheckCircle2 } from 'lucide-react';
-import VideoSDKVideo from '../../components/VideoSDKVideo';
+import TRTCVideo from '../../components/TRTCVideo';
 import { useStore } from '../../store/useStore';
 import { io, Socket } from 'socket.io-client';
 
@@ -285,15 +285,11 @@ const PatientConsultationRoom = () => {
       {/* Componente de Vídeo VideoSDK WebRTC */}
       <div style={{ width: '100%', height: '100%' }}>
         {roomId ? (
-          <VideoSDKVideo
+          <TRTCVideo
             roomId={roomId}
             role="patient"
             userName={user?.name || 'Paciente'}
             onLeave={() => navigate('/patient/dashboard')}
-            onMeetingEnd={() => {
-              // Se o meeting encerrar pelo SDK, também finaliza a tela
-              setStatus('ended');
-            }}
           />
         ) : (
           <div style={{ color: 'white', display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center' }}>

@@ -86,6 +86,8 @@ services:
         VITE_TURN_SERVER: ${VITE_TURN_SERVER:-}
         VITE_TURN_USERNAME: ${COTURN_USER:-user}
         VITE_TURN_PASSWORD: ${COTURN_PASSWORD:-password}
+        VITE_TRTC_SDK_APP_ID: ${VITE_TRTC_SDK_APP_ID:-0}
+        VITE_TRTC_SDK_SECRET_KEY: ${VITE_TRTC_SDK_SECRET_KEY:-}
     container_name: medpronto_frontend
     restart: always
     networks:
