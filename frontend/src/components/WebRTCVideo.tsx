@@ -21,6 +21,7 @@ const WebRTCVideo: React.FC<WebRTCVideoProps> = ({ roomId, role, userName, onLea
   const socketRef = useRef<Socket | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
+  const candidatesQueueRef = useRef<RTCIceCandidateInit[]>([]);
 
   const [isAudioMuted, setIsAudioMuted] = useState(false);
   const [isVideoMuted, setIsVideoMuted] = useState(false);
@@ -107,8 +108,22 @@ const WebRTCVideo: React.FC<WebRTCVideoProps> = ({ roomId, role, userName, onLea
             await pc.setLocalDescription(answer);
             socket.emit('signal', { roomId, signal: { sdp: pc.localDescription }, to: sender });
           }
+
+          // Processa candidatos ICE enfileirados após definir a descrição remota
+          while (candidatesQueueRef.current.length > 0) {
+            const candidate = candidatesQueueRef.current.shift();
+            if (candidate) {
+              await pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(err => {
+                console.warn('[WebRTC] Erro ao adicionar candidato da fila:', err);
+              });
+            }
+          }
         } else if (signal.candidate) {
-          await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+          if (pc.remoteDescription && pc.remoteDescription.type) {
+            await pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+          } else {
+            candidatesQueueRef.current.push(signal.candidate);
+          }
         }
       } catch (err) {
         console.error('Erro no processamento de sinal WebRTC:', err);
@@ -136,7 +151,7 @@ const WebRTCVideo: React.FC<WebRTCVideoProps> = ({ roomId, role, userName, onLea
   /**
    * Cria e configura a RTCPeerConnection
    */
-  const createPeerConnection = async (targetSocketId: string, isInitiator: boolean) => {
+  const createPeerConnection = (targetSocketId: string, isInitiator: boolean) => {
     if (pcRef.current) {
       pcRef.current.close();
     }
@@ -184,17 +199,19 @@ const WebRTCVideo: React.FC<WebRTCVideoProps> = ({ roomId, role, userName, onLea
 
     // Se for o iniciador, envia o Offer SDP
     if (isInitiator) {
-      try {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        socketRef.current?.emit('signal', {
-          roomId,
-          signal: { sdp: pc.localDescription },
-          to: targetSocketId
-        });
-      } catch (err) {
-        console.error('Erro ao criar Offer WebRTC:', err);
-      }
+      (async () => {
+        try {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          socketRef.current?.emit('signal', {
+            roomId,
+            signal: { sdp: pc.localDescription },
+            to: targetSocketId
+          });
+        } catch (err) {
+          console.error('Erro ao criar Offer WebRTC:', err);
+        }
+      })();
     }
   };
 

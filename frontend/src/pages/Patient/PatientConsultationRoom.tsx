@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import apiClient from '../../api/client';
 import { ShieldCheck, HeartPulse, FileText, ClipboardList, Download, CheckCircle2 } from 'lucide-react';
-import VideoSDKVideo from '../../components/VideoSDKVideo';
+import WebRTCVideo from '../../components/WebRTCVideo';
 import { useStore } from '../../store/useStore';
 import { io, Socket } from 'socket.io-client';
 
@@ -285,7 +285,7 @@ const PatientConsultationRoom = () => {
       {/* Componente de Vídeo VideoSDK WebRTC */}
       <div style={{ width: '100%', height: '100%' }}>
         {roomId ? (
-          <VideoSDKVideo
+          <WebRTCVideo
             roomId={roomId}
             role="patient"
             userName={user?.name || 'Paciente'}
