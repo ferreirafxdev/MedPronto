@@ -8,7 +8,7 @@ import {
   Activity, ShieldCheck, FileCheck, Stethoscope, History, Loader2, ArrowLeft, X,
   FileSignature, ChevronLeft, ChevronRight, Smartphone
 } from 'lucide-react';
-import WebRTCVideo from '../../components/WebRTCVideo';
+import VideoSDKVideo from '../../components/VideoSDKVideo';
 
 /**
  * Cronômetro de Atendimento — memorizado para não re-renderizar toda a sala a cada segundo
@@ -284,7 +284,7 @@ const ConsultationRoom: React.FC = () => {
         background: '#020617'
       }}>
         {roomId ? (
-          <WebRTCVideo
+          <VideoSDKVideo
             roomId={roomId}
             role="doctor"
             userName={user?.name || 'Médico'}
