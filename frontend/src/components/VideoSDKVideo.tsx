@@ -133,6 +133,9 @@ const VideoSDKVideo: React.FC<VideoSDKVideoProps> = ({
       const VideoSDK = await loadSDK();
       sdkRef.current = VideoSDK;
 
+      // Configura o Token globalmente no VideoSDK como exigido pelo JS SDK
+      VideoSDK.config(VIDEOSDK_TOKEN);
+
       // Tenta criar/validar a sala
       try {
         await createMeetingRoom();
@@ -140,31 +143,32 @@ const VideoSDKVideo: React.FC<VideoSDKVideoProps> = ({
         // Ignora erro de criação (sala pode já existir)
       }
 
-      // Inicializa o meeting
+      // Inicializa o meeting sem o token no parâmetro interno
       const meeting = VideoSDK.initMeeting({
         meetingId: roomId,
         name: userName,
         micEnabled: micOn,
         webcamEnabled: camOn,
-        token: VIDEOSDK_TOKEN,
-        debugMode: false,
       });
 
       meetingRef.current = meeting;
+
+      // Adiciona o listener de stream para o participante local imediatamente
+      meeting.localParticipant.on('stream-enabled', (stream: any) => {
+        console.log('[VideoSDK] Stream local habilitada:', stream.kind);
+        if (stream.kind === 'video') {
+          renderParticipantVideo(meeting.localParticipant, localVideoRef.current);
+        }
+      });
 
       // Evento: entrou na meeting
       meeting.on('meeting-joined', () => {
         console.log('[VideoSDK] Meeting joined:', roomId);
         setState('joined');
 
-        // Renderiza self-view local
+        // Renderiza self-view local se já estiver disponível
         if (meeting.localParticipant) {
           renderParticipantVideo(meeting.localParticipant, localVideoRef.current);
-          meeting.localParticipant.on('stream-enabled', (stream: any) => {
-            if (stream.kind === 'video') {
-              renderParticipantVideo(meeting.localParticipant, localVideoRef.current);
-            }
-          });
         }
 
         // Renderiza participantes que já estavam na sala antes de entrarmos
