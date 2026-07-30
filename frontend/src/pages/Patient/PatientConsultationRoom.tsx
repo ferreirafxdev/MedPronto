@@ -292,9 +292,7 @@ const PatientConsultationRoom = () => {
             onLeave={() => navigate('/patient/dashboard')}
             onMeetingEnd={() => {
               // Se o meeting encerrar pelo SDK, também finaliza a tela
-              if (status !== 'ended') {
-                setStatus('ended');
-              }
+              setStatus('ended');
             }}
           />
         ) : (
