@@ -62,24 +62,29 @@ export class PDFTemplate {
     }
 
     private drawTitle(title: string) {
-        // Move significantly down to avoid overlapping header line
-        this.doc.moveDown(2);
-        this.doc.fontSize(15)
+        // Posição Y absoluta segura abaixo da linha do cabeçalho (que está em Y=65)
+        const titleY = 95;
+        this.doc.fontSize(14)
             .font('Helvetica-Bold')
             .fillColor(this.secondaryColor)
-            .text(title.toUpperCase(), { align: 'center' });
-        this.doc.moveDown(1.5);
+            .text(title.toUpperCase(), 60, titleY, { 
+                align: 'center', 
+                width: this.doc.page.width - 120 
+            });
+        
+        // Reposiciona o cursor Y do PDFKit para continuar o corpo do texto abaixo do título
+        this.doc.y = titleY + 30;
     }
 
-    private drawFooter(doctorName: string, doctorCRM: string, validationCode?: string) {
-        const bottom = this.doc.page.height - 85;
+    private drawFooter(doctorName: string, doctorCRM: string, validationCode?: string, birdIdSession?: string) {
+        const bottom = this.doc.page.height - 95;
         const rightPos = this.doc.page.width - 60;
 
         // Signature Area
         this.doc.moveTo(150, bottom)
             .lineTo(445, bottom)
             .lineWidth(0.5)
-            .strokeColor('#94a3b8')
+            .strokeColor('#cbd5e1')
             .stroke();
 
         this.doc.fontSize(10)
@@ -91,6 +96,24 @@ export class PDFTemplate {
             .font('Helvetica')
             .fillColor('#64748b')
             .text(`Registro Profissional: ${doctorCRM}`, 150, bottom + 18, { width: 295, align: 'center' });
+
+        // Assinatura Digital Soluti BirdID Badge
+        if (birdIdSession) {
+            this.doc.save();
+            // Desenhar um fundo leve verde para a assinatura
+            this.doc.roundedRect(160, bottom + 32, 275, 22, 4)
+                .fillColor('#ecfdf5')
+                .fill();
+            this.doc.fontSize(7)
+                .font('Helvetica-Bold')
+                .fillColor('#059669')
+                .text('✔️ ASSINADO DIGITALMENTE VIA SOLUTI BIRDID', 160, bottom + 35, { width: 275, align: 'center' });
+            this.doc.fontSize(6)
+                .font('Helvetica')
+                .fillColor('#047857')
+                .text(`ID de Autorização: ${birdIdSession}`, 160, bottom + 44, { width: 275, align: 'center' });
+            this.doc.restore();
+        }
 
         // Validation Info
         if (validationCode) {
@@ -112,23 +135,32 @@ export class PDFTemplate {
             .fillColor(this.secondaryColor)
             .text(content, {
                 align: 'justify',
-                lineGap: 2,
-                paragraphGap: 6
+                lineGap: 2.5,
+                paragraphGap: 8
             });
     }
 
     addSection(title: string, content: string) {
-        this.doc.moveDown(0.8);
+        this.doc.moveDown(1.0);
         this.doc.fontSize(10).font('Helvetica-Bold').fillColor(this.primaryColor).text(title.toUpperCase());
-        this.doc.moveDown(0.2);
+        
+        // Linha divisória sutil abaixo do título da seção
+        const currentY = this.doc.y;
+        this.doc.moveTo(60, currentY + 2)
+            .lineTo(this.doc.page.width - 60, currentY + 2)
+            .lineWidth(0.5)
+            .strokeColor('#e2e8f0')
+            .stroke();
+            
+        this.doc.moveDown(0.4);
         this.doc.fontSize(10).font('Helvetica').fillColor(this.secondaryColor).text(content, {
             align: 'justify',
-            lineGap: 1.5
+            lineGap: 2
         });
     }
 
-    finalizeWithFooter(doctorName: string, doctorCRM: string, validationCode?: string) {
-        this.drawFooter(doctorName, doctorCRM, validationCode);
+    finalizeWithFooter(doctorName: string, doctorCRM: string, validationCode?: string, birdIdSession?: string) {
+        this.drawFooter(doctorName, doctorCRM, validationCode, birdIdSession);
         this.doc.end();
     }
 }

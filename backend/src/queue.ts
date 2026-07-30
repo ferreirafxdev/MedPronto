@@ -50,7 +50,7 @@ async function generatePDFBuffer(type: string, data: any): Promise<Buffer> {
         if (data.exams) template.addSection('Exames Solicitados', data.exams);
       }
 
-      template.finalizeWithFooter(doctorName, doctorCRM, data.validationCode);
+      template.finalizeWithFooter(doctorName, doctorCRM, data.validationCode, data.birdIdSession);
     } catch (err) {
       reject(err);
     }

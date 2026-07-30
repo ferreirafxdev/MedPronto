@@ -117,20 +117,7 @@ const AdminDashboard = () => {
     }
   };
 
-  /**
-   * Libera ou bloqueia o download de documentos para o paciente
-   */
-  const handleReleaseDocument = async (type: 'ATESTADO' | 'RECEITA', id: string, released: boolean) => {
-    try {
-      await apiClient.post('/api/admin/release-document', { type, id, released });
-      // Atualiza o modal localmente para refletir a mudança
-      if (selectedRecord) {
-        handleViewRecord(selectedRecord.patient.id);
-      }
-    } catch (e) { 
-        alert("Erro ao atualizar status de liberação."); 
-    }
-  };
+
 
   /**
    * Gera uma versão em texto do prontuário para download (Backup Admin)
@@ -415,14 +402,6 @@ Médico: ${a.doctor_name}
                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
                               <span style={{ fontWeight: 700, fontSize: '0.85rem' }}>{new Date(c.created_at).toLocaleString()}</span>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <label style={{ fontSize: '0.7rem', color: c.download_released ? '#10b981' : '#64748b', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                  <input 
-                                    type="checkbox" 
-                                    checked={c.download_released} 
-                                    onChange={(e) => handleReleaseDocument('RECEITA', c.id, e.target.checked)}
-                                  />
-                                  {c.download_released ? 'LIBERADO' : 'LIBERAR'}
-                                </label>
                                 <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Cod: {c.validation_code}</span>
                               </div>
                            </div>
@@ -453,14 +432,6 @@ Médico: ${a.doctor_name}
                               <div style={{ fontSize: '0.8rem', color: '#15803d' }}>Emitido em {new Date(a.created_at).toLocaleDateString()} | CID: {a.cid}</div>
                            </div>
                            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                              <label style={{ fontSize: '0.7rem', color: a.download_released ? '#10b981' : '#64748b', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                <input 
-                                  type="checkbox" 
-                                  checked={a.download_released} 
-                                  onChange={(e) => handleReleaseDocument('ATESTADO', a.id, e.target.checked)}
-                                />
-                                {a.download_released ? 'LIBERADO' : 'LIBERAR'}
-                              </label>
                               <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#166534' }}>{a.code}</div>
                            </div>
                         </div>

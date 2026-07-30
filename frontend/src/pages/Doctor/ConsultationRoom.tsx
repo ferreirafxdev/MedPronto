@@ -1,11 +1,12 @@
-import React, { useEffect, useState, memo, useRef } from 'react';
+import React, { useEffect, useState, memo, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import apiClient from '../../api/client';
 import {
   Edit3, PenTool, FileText, Clock, User,
   Save, AlertCircle, CheckCircle2,
-  Activity, ShieldCheck, FileCheck, Stethoscope, History, Loader2, ArrowLeft, X
+  Activity, ShieldCheck, FileCheck, Stethoscope, History, Loader2, ArrowLeft, X,
+  FileSignature, ChevronLeft, ChevronRight, Smartphone
 } from 'lucide-react';
 import VideoSDKVideo from '../../components/VideoSDKVideo';
 
@@ -44,11 +45,10 @@ const ConsultationTimer = memo(() => {
 /**
  * Sala de Consulta Médica Profissional
  * 
- * Layout: Grid de duas colunas
- * - Esquerda: Vídeo VideoSDK (paciente fullscreen, self-view no canto sup. esq.) + dados do paciente
- * - Direita: Prontuário médico (evolução, receita, atestado, exames, histórico)
- * 
- * Finalização: Automática e em tempo real via WebSocket
+ * Layout:
+ * - Fundo: Vídeo em tela cheia (100% width/height)
+ * - Direita: Painel lateral de Prontuário deslizante (Drawer)
+ * - Botão flutuante para mostrar/ocultar o prontuário
  */
 const ConsultationRoom: React.FC = () => {
   const { roomId } = useParams();
@@ -64,6 +64,9 @@ const ConsultationRoom: React.FC = () => {
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
+  // Controle do Painel Lateral
+  const [panelOpen, setPanelOpen] = useState(true);
+
   // Campos do Prontuário
   const [notes, setNotes] = useState('');
   const [prescriptionContent, setPrescriptionContent] = useState('');
@@ -72,8 +75,18 @@ const ConsultationRoom: React.FC = () => {
   const [cid, setCid] = useState('');
   const [atestadoContent, setAtestadoContent] = useState('');
 
+  // Estados do Processo de Assinatura Digital Soluti BirdID
+  const [doctorCpf, setDoctorCpf] = useState(user?.cpf || '');
+  const [birdIdStatus, setBirdIdStatus] = useState<'idle' | 'requesting' | 'pending' | 'signed' | 'error'>('idle');
+  const [birdIdSessionId, setBirdIdSessionId] = useState<string | null>(null);
+  const [birdIdError, setBirdIdError] = useState<string | null>(null);
+  const pollingRef = useRef<any>(null);
+
   useEffect(() => {
     fetchPatientRecord();
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
   }, [roomId]);
 
   const fetchPatientRecord = async () => {
@@ -96,8 +109,60 @@ const ConsultationRoom: React.FC = () => {
   };
 
   /**
-   * Finaliza a consulta — COMPLETAMENTE AUTOMÁTICO
-   * Não há mais confirm() de browser. O médico vê um modal premium de confirmação.
+   * Dispara o fluxo de assinatura digital no celular do médico
+   */
+  const handleStartBirdIdSignature = async () => {
+    if (!doctorCpf) {
+      setBirdIdError('Por favor, informe seu CPF para assinar.');
+      return;
+    }
+    setBirdIdStatus('requesting');
+    setBirdIdError(null);
+    
+    try {
+      const response = await apiClient.post('/api/birdid/start', { cpf: doctorCpf });
+      const { sessionId } = response.data;
+      
+      if (sessionId) {
+        setBirdIdSessionId(sessionId);
+        setBirdIdStatus('pending');
+        
+        // Inicia o Polling de validação de status a cada 2.5s
+        if (pollingRef.current) clearInterval(pollingRef.current);
+        pollingRef.current = setInterval(() => checkSignatureStatus(sessionId), 2500);
+      } else {
+        setBirdIdStatus('error');
+        setBirdIdError('Não foi possível iniciar a sessão de assinatura.');
+      }
+    } catch (err: any) {
+      setBirdIdStatus('error');
+      setBirdIdError(err.response?.data?.error || 'Erro ao comunicar com o servidor BirdID.');
+    }
+  };
+
+  /**
+   * Consulta o status da assinatura em background
+   */
+  const checkSignatureStatus = async (sessionId: string) => {
+    try {
+      const response = await apiClient.get(`/api/birdid/status/${sessionId}`);
+      const { status } = response.data;
+      
+      if (status === 'ready') {
+        if (pollingRef.current) clearInterval(pollingRef.current);
+        setBirdIdStatus('signed');
+      } else if (status === 'denied') {
+        if (pollingRef.current) clearInterval(pollingRef.current);
+        setBirdIdStatus('error');
+        setBirdIdError('Assinatura recusada no aplicativo BirdID.');
+      }
+    } catch (e) {
+      // Falhas temporárias de rede continuam o polling
+    }
+  };
+
+  /**
+   * Finaliza a consulta médica e emite os documentos
    */
   const handleEndConsultation = async () => {
     setShowConfirmModal(false);
@@ -110,12 +175,16 @@ const ConsultationRoom: React.FC = () => {
         prescriptions: prescriptionContent,
         exams,
         atestado: atestadoContent
-          ? { daysOff, cid, content: atestadoContent }
+          ? { 
+              daysOff, 
+              cid, 
+              content: atestadoContent,
+              birdIdSession: birdIdStatus === 'signed' ? birdIdSessionId : null 
+            }
           : null
       });
 
       setSavedSuccess(true);
-      // Navega após breve animação de sucesso
       setTimeout(() => navigate('/doctor/dashboard'), 1500);
     } catch (err: any) {
       alert('Erro ao finalizar consulta: ' + (err.response?.data?.error || err.message));
@@ -127,24 +196,25 @@ const ConsultationRoom: React.FC = () => {
   return (
     <div style={{
       height: '100vh',
-      background: '#090d16',
+      background: '#020617',
       display: 'flex',
       flexDirection: 'column',
       overflow: 'hidden',
       color: 'white',
-      fontFamily: '"Inter", sans-serif'
+      fontFamily: '"Inter", sans-serif',
+      position: 'relative'
     }}>
 
-      {/* ─── Header ─── */}
+      {/* ─── Header Principal (Fixo no Topo) ─── */}
       <header style={{
         padding: '0.75rem 1.25rem',
-        background: 'rgba(15, 23, 42, 0.98)',
+        background: 'rgba(15, 23, 42, 0.95)',
         backdropFilter: 'blur(16px)',
         borderBottom: '1px solid rgba(255,255,255,0.08)',
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        zIndex: 20,
+        zIndex: 40,
         flexShrink: 0
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
@@ -180,7 +250,7 @@ const ConsultationRoom: React.FC = () => {
               display: 'flex', alignItems: 'center', gap: '0.5rem',
               color: '#10b981', fontWeight: 800, fontSize: '0.9rem'
             }}>
-              <CheckCircle2 size={20} /> Consulta Finalizada!
+              <CheckCircle2 size={20} /> Atendimento Concluído!
             </div>
           ) : (
             <button
@@ -203,187 +273,165 @@ const ConsultationRoom: React.FC = () => {
         </div>
       </header>
 
-      {/* ─── Área Principal ─── */}
-      <main style={{
-        flex: 1,
-        display: 'grid',
-        gridTemplateColumns: '420px 1fr',
-        gap: '1rem',
-        padding: '1rem',
-        overflow: 'hidden',
-        boxSizing: 'border-box'
+      {/* ─── Vídeo de Chamada (Fundo Fullscreen) ─── */}
+      <div style={{
+        position: 'absolute',
+        top: '65px',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 1,
+        background: '#020617'
       }}>
-
-        {/* ─── Coluna Esquerda: Vídeo + Card do Paciente ─── */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', overflow: 'hidden' }}>
-
-          {/* Container de Vídeo VideoSDK WebRTC */}
+        {roomId ? (
+          <VideoSDKVideo
+            roomId={roomId}
+            role="doctor"
+            userName={user?.name || 'Médico'}
+            onLeave={() => navigate('/doctor/dashboard')}
+          />
+        ) : (
           <div style={{
-            height: '280px',
-            background: '#020617',
-            borderRadius: '1.25rem',
-            overflow: 'hidden',
-            position: 'relative',
-            border: '1px solid rgba(255,255,255,0.08)',
-            boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)',
-            flexShrink: 0
+            color: '#94a3b8', display: 'flex', height: '100%',
+            alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '0.5rem'
           }}>
-            {roomId ? (
-              <VideoSDKVideo
-                roomId={roomId}
-                role="doctor"
-                userName={user?.name || 'Médico'}
-                onLeave={() => navigate('/doctor/dashboard')}
-              />
-            ) : (
-              <div style={{
-                color: '#94a3b8', display: 'flex', height: '100%',
-                alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '0.5rem'
-              }}>
-                <Loader2 size={28} style={{ animation: 'spin 1.5s linear infinite' }} color="#38bdf8" />
-                <span>Inicializando videochamada...</span>
-              </div>
-            )}
+            <Loader2 size={36} style={{ animation: 'spin 1.5s linear infinite' }} color="#38bdf8" />
+            <span style={{ fontWeight: 600 }}>Inicializando teleconsulta...</span>
           </div>
+        )}
+      </div>
 
-          {/* Card do Paciente */}
+      {/* ─── Botão Flutuante para Mostrar/Ocultar o Prontuário ─── */}
+      <button
+        onClick={() => setPanelOpen(!panelOpen)}
+        style={{
+          position: 'absolute',
+          bottom: '2.5rem',
+          right: panelOpen ? '490px' : '2.5rem',
+          zIndex: 35,
+          background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+          color: 'white',
+          border: 'none',
+          padding: '0.9rem 1.6rem',
+          borderRadius: '2rem',
+          fontWeight: 800,
+          fontSize: '0.9rem',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.6rem',
+          boxShadow: '0 10px 25px rgba(37,99,235,0.4)',
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
+      >
+        <FileText size={18} />
+        {panelOpen ? 'Ocultar Prontuário' : 'Abrir Prontuário (Ficha)'}
+      </button>
+
+      {/* ─── Painel Lateral Deslizante (Drawer) ─── */}
+      <div style={{
+        position: 'absolute',
+        top: '65px',
+        bottom: 0,
+        right: 0,
+        width: '460px',
+        background: '#ffffff',
+        boxShadow: '-10px 0 30px rgba(0,0,0,0.3)',
+        zIndex: 30,
+        display: 'flex',
+        flexDirection: 'column',
+        transform: panelOpen ? 'translateX(0)' : 'translateX(100%)',
+        transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        color: '#0f172a',
+        borderLeft: '1px solid #e2e8f0'
+      }}>
+        {/* Scrollable Container */}
+        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          
+          {/* Card do Paciente Integrado */}
           <div style={{
-            flex: 1,
-            background: 'rgba(30, 41, 59, 0.6)',
-            backdropFilter: 'blur(12px)',
-            borderRadius: '1.25rem',
+            background: '#f8fafc',
+            borderBottom: '1px solid #e2e8f0',
             padding: '1.25rem',
-            border: '1px solid rgba(255,255,255,0.08)',
             display: 'flex',
             flexDirection: 'column',
-            overflowY: 'auto',
-            minHeight: 0
+            gap: '0.85rem'
           }}>
-            {/* Avatar e Nome */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
               <div style={{
-                width: '52px', height: '52px', borderRadius: '1rem', flexShrink: 0,
-                background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 8px 16px -4px rgba(37,99,235,0.4)'
+                width: '44px', height: '44px', borderRadius: '0.75rem',
+                background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white'
               }}>
-                <User size={26} color="white" />
+                <User size={22} />
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <h3 style={{
-                  fontSize: '1.1rem', margin: 0, fontWeight: 800, color: 'white',
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
-                }}>
-                  {fetchingPatient ? 'Carregando...' : (patientData?.name || 'Paciente em Atendimento')}
-                </h3>
-                <div style={{ color: '#64748b', fontSize: '0.78rem', marginTop: '0.15rem' }}>
-                  CPF: {patientData?.cpf || 'Não informado'}
-                </div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <h4 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 800, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {fetchingPatient ? 'Buscando cadastro...' : (patientData?.name || 'Paciente em Atendimento')}
+                </h4>
+                <span style={{ fontSize: '0.78rem', color: '#64748b' }}>CPF: {patientData?.cpf || 'N/A'}</span>
               </div>
             </div>
 
             {/* Queixa Principal */}
             {queueItem?.complaint && (
               <div style={{
-                background: 'rgba(239, 68, 68, 0.08)',
-                border: '1px solid rgba(239, 68, 68, 0.2)',
-                borderRadius: '0.75rem', padding: '0.75rem 1rem', marginBottom: '1rem'
+                background: 'rgba(239, 68, 68, 0.05)',
+                border: '1px solid rgba(239, 68, 68, 0.15)',
+                borderRadius: '0.6rem', padding: '0.6rem 0.85rem', fontSize: '0.82rem'
               }}>
-                <div style={{
-                  fontSize: '0.65rem', fontWeight: 900, color: '#f87171',
-                  letterSpacing: '0.05em', marginBottom: '0.25rem',
-                  display: 'flex', alignItems: 'center', gap: '0.35rem'
-                }}>
-                  <Activity size={12} /> QUEIXA PRINCIPAL
-                </div>
-                <div style={{ fontSize: '0.85rem', color: '#fecdd3', lineHeight: 1.4, fontWeight: 600 }}>
-                  "{queueItem.complaint}"
-                </div>
+                <span style={{ fontWeight: 900, color: '#ef4444', fontSize: '0.65rem', display: 'block', marginBottom: '0.15rem', letterSpacing: '0.04em' }}>
+                  🚨 FILA: QUEIXA DECLARADA
+                </span>
+                <span style={{ color: '#7f1d1d', fontWeight: 600 }}>"{queueItem.complaint}"</span>
               </div>
             )}
 
-            {/* Dados Demográficos */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
               <InfoBadge label="IDADE" value={patientData?.age ? `${patientData.age} anos` : 'N/A'} />
               <InfoBadge label="NASCIMENTO" value={patientData?.birth_date || 'N/A'} />
             </div>
-
-            {/* Histórico */}
-            <div style={{ marginTop: 'auto', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-              <div style={{ fontSize: '0.65rem', fontWeight: 900, color: '#64748b', marginBottom: '0.4rem', letterSpacing: '0.04em' }}>
-                HISTÓRICO NO SISTEMA
-              </div>
-              <div style={{ display: 'flex', gap: '1.25rem', fontSize: '0.82rem', color: '#cbd5e1' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <Stethoscope size={13} color="#38bdf8" />
-                  {historyRecord.consultations?.length || 0} Consultas
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  <FileCheck size={13} color="#34d399" />
-                  {historyRecord.atestados?.length || 0} Atestados
-                </span>
-              </div>
-            </div>
           </div>
-        </div>
 
-        {/* ─── Coluna Direita: Prontuário Médico ─── */}
-        <div style={{
-          background: '#ffffff',
-          borderRadius: '1.25rem',
-          color: '#0f172a',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
-          minHeight: 0
-        }}>
           {/* Abas do Prontuário */}
           <div style={{
             display: 'flex',
-            background: '#f8fafc',
+            background: '#f1f5f9',
             borderBottom: '1px solid #e2e8f0',
-            padding: '0 1rem',
+            padding: '0 0.5rem',
             overflowX: 'auto',
             flexShrink: 0
           }}>
-            <RecordTab active={activeTab === 'evolucao'} onClick={() => setActiveTab('evolucao')} icon={<Edit3 size={16} />} label="EVOLUÇÃO" />
-            <RecordTab active={activeTab === 'receituario'} onClick={() => setActiveTab('receituario')} icon={<PenTool size={16} />} label="RECEITUÁRIO" />
-            <RecordTab active={activeTab === 'atestado'} onClick={() => setActiveTab('atestado')} icon={<FileText size={16} />} label="ATESTADO" />
-            <RecordTab active={activeTab === 'exames'} onClick={() => setActiveTab('exames')} icon={<AlertCircle size={16} />} label="EXAMES" />
-            <RecordTab active={activeTab === 'historico'} onClick={() => setActiveTab('historico')} icon={<History size={16} />} label="HISTÓRICO" />
+            <RecordTab active={activeTab === 'evolucao'} onClick={() => setActiveTab('evolucao')} icon={<Edit3 size={15} />} label="EVOLUÇÃO" />
+            <RecordTab active={activeTab === 'receituario'} onClick={() => setActiveTab('receituario')} icon={<PenTool size={15} />} label="RECEITUÁRIO" />
+            <RecordTab active={activeTab === 'atestado'} onClick={() => setActiveTab('atestado')} icon={<FileText size={15} />} label="ATESTADO" />
+            <RecordTab active={activeTab === 'exames'} onClick={() => setActiveTab('exames')} icon={<AlertCircle size={15} />} label="EXAMES" />
+            <RecordTab active={activeTab === 'historico'} onClick={() => setActiveTab('historico')} icon={<History size={15} />} label="HISTÓRICO" />
           </div>
 
-          {/* Conteúdo da aba ativa */}
-          <div style={{ flex: 1, padding: '1.25rem', overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-
+          {/* Área de edição da Aba */}
+          <div style={{ flex: 1, padding: '1.25rem', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            
             {activeTab === 'evolucao' && (
-              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                <TabHeader
-                  title="EVOLUÇÃO CLÍNICA E ANAMNESE"
-                  subtitle="Registrado no prontuário digital do paciente"
-                />
+              <div style={{ display: 'flex', flexDirection: 'column', height: '100%', flex: 1 }}>
+                <TabHeader title="EVOLUÇÃO CLÍNICA / ANAMNESE" subtitle="Anotações internas de prontuário" />
                 <textarea
                   className="record-textarea"
-                  placeholder="Descreva a anamnese, histórico de sintomas, exame físico e conduta médica..."
+                  placeholder="Relate sintomas, exame clínico, conduta adotada e orientações..."
                   value={notes}
                   onChange={e => setNotes(e.target.value)}
-                  style={{ flex: 1, minHeight: '220px' }}
+                  style={{ flex: 1, minHeight: '180px' }}
                 />
               </div>
             )}
 
             {activeTab === 'receituario' && (
-              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                <TabHeader
-                  title="PRESCRIÇÃO DE MEDICAMENTOS"
-                  subtitle="PDF gerado automaticamente com assinatura digital"
-                  subtitleColor="#2563eb"
-                />
+              <div style={{ display: 'flex', flexDirection: 'column', height: '100%', flex: 1 }}>
+                <TabHeader title="RECEITUÁRIO MÉDICO" subtitle="Geração de receita digital para o paciente" />
                 <textarea
                   className="record-textarea"
-                  style={{ fontFamily: 'monospace', color: '#1e40af', flex: 1, minHeight: '220px' }}
-                  placeholder={`1. Amoxicilina 500mg - Tomar 1 comprimido de 8/8h por 7 dias.\n2. Paracetamol 750mg - Tomar 1 comprimido de 6/6h em caso de dor ou febre.`}
+                  style={{ fontFamily: 'monospace', color: '#1e40af', flex: 1, minHeight: '180px' }}
+                  placeholder={`1. Uso Oral: Amoxicilina 500mg\n   Tomar 1 cápsula de 8 em 8 horas por 7 dias.\n\n2. Paracetamol 750mg\n   Tomar 1 comp. de 6 em 6h se dor ou febre.`}
                   value={prescriptionContent}
                   onChange={e => setPrescriptionContent(e.target.value)}
                 />
@@ -391,74 +439,160 @@ const ConsultationRoom: React.FC = () => {
             )}
 
             {activeTab === 'atestado' && (
-              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem', flexShrink: 0 }}>
-                  <h3 style={{ fontSize: '0.95rem', margin: 0, fontWeight: 800, color: '#1e293b' }}>
-                    ATESTADO MÉDICO DE AFASTAMENTO
+              <div style={{ display: 'flex', flexDirection: 'column', height: '100%', flex: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.85rem', flexWrap: 'wrap', gap: '0.5rem', flexShrink: 0 }}>
+                  <h3 style={{ fontSize: '0.85rem', margin: 0, fontWeight: 800, color: '#1e293b' }}>
+                    ATESTADO DE AFASTAMENTO
                   </h3>
-                  <div style={{ display: 'flex', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <div className="input-group">
-                      <label>DIAS DE AFASTAMENTO</label>
-                      <input type="number" min="1" value={daysOff} onChange={e => setDaysOff(e.target.value)} />
+                      <label>DIAS</label>
+                      <input type="number" min="1" value={daysOff} onChange={e => setDaysOff(e.target.value)} style={{ width: '60px' }} />
                     </div>
                     <div className="input-group">
-                      <label>CID (OPCIONAL)</label>
-                      <input type="text" value={cid} onChange={e => setCid(e.target.value)} placeholder="Ex: J06.9" />
+                      <label>CID</label>
+                      <input type="text" value={cid} onChange={e => setCid(e.target.value)} placeholder="Ex: J06" style={{ width: '70px' }} />
                     </div>
                   </div>
                 </div>
+                
                 <textarea
                   className="record-textarea"
-                  placeholder="Atesto para os devidos fins que o(a) paciente acima necessita de repouso por motivo de saúde..."
+                  placeholder="Justifico que o paciente necessita de afastamento por motivo de tratamento médico..."
                   value={atestadoContent}
                   onChange={e => setAtestadoContent(e.target.value)}
+                  style={{ flex: 1, minHeight: '130px', marginBottom: '1rem' }}
+                />
+
+                {/* ─── MÓDULO DE ASSINATURA DIGITAL BIRDID ─── */}
+                <div style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '0.85rem',
+                  padding: '1rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.65rem'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Smartphone size={18} color="#2563eb" />
+                    <span style={{ fontWeight: 800, fontSize: '0.8rem', color: '#1e293b' }}>
+                      Assinatura Digital Soluti BirdID
+                    </span>
+                  </div>
+
+                  {birdIdStatus === 'idle' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <div className="input-group" style={{ width: '100%' }}>
+                        <label>CPF DO MÉDICO TITULAR</label>
+                        <input 
+                          type="text" 
+                          placeholder="Apenas números" 
+                          value={doctorCpf}
+                          onChange={e => setDoctorCpf(e.target.value)}
+                          style={{ width: '100%', boxSizing: 'border-box' }}
+                        />
+                      </div>
+                      <button
+                        onClick={handleStartBirdIdSignature}
+                        disabled={!atestadoContent}
+                        style={{
+                          background: atestadoContent ? '#1e293b' : '#cbd5e1',
+                          color: atestadoContent ? 'white' : '#94a3b8',
+                          border: 'none', padding: '0.6rem', borderRadius: '0.5rem',
+                          fontWeight: 800, fontSize: '0.75rem', cursor: atestadoContent ? 'pointer' : 'not-allowed',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem'
+                        }}
+                      >
+                        <FileSignature size={14} /> Solicitar Assinatura no App
+                      </button>
+                    </div>
+                  )}
+
+                  {birdIdStatus === 'requesting' && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', color: '#475569', padding: '0.5rem 0' }}>
+                      <Loader2 size={16} className="animate-spin" color="#3b82f6" />
+                      Iniciando sessão de assinatura BirdID...
+                    </div>
+                  )}
+
+                  {birdIdStatus === 'pending' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: '#eff6ff', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #bfdbfe' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.78rem', color: '#1d4ed8', fontWeight: 700 }}>
+                        <Loader2 size={14} className="animate-spin" />
+                        Aguardando aprovação no seu celular BirdID
+                      </div>
+                      <span style={{ fontSize: '0.7rem', color: '#1e3a8a', lineHeight: 1.3 }}>
+                        Enviamos uma notificação push. Abra o app BirdID no seu celular e confirme a assinatura digital deste atestado.
+                      </span>
+                    </div>
+                  )}
+
+                  {birdIdStatus === 'signed' && (
+                    <div style={{ background: '#ecfdf5', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #a7f3d0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <CheckCircle2 size={18} color="#10b981" />
+                      <div>
+                        <div style={{ color: '#065f46', fontWeight: 800, fontSize: '0.78rem' }}>Atestado Assinado com Sucesso!</div>
+                        <span style={{ fontSize: '0.65rem', color: '#047857', fontFamily: 'monospace' }}>ID: {birdIdSessionId?.substring(0, 15)}...</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {birdIdStatus === 'error' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                      <div style={{ background: '#fef2f2', padding: '0.75rem', borderRadius: '0.5rem', border: '1px solid #fecdd3', color: '#991b1b', fontSize: '0.78rem', lineHeight: 1.3 }}>
+                        ⚠️ {birdIdError || 'Erro ao assinar com BirdID.'}
+                      </div>
+                      <button 
+                        onClick={() => setBirdIdStatus('idle')} 
+                        style={{ border: 'none', background: 'none', color: '#2563eb', fontWeight: 800, fontSize: '0.7rem', cursor: 'pointer', textAlign: 'left' }}
+                      >
+                        Tentar novamente
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'exames' && (
+              <div style={{ display: 'flex', flexDirection: 'column', height: '100%', flex: 1 }}>
+                <TabHeader title="SOLICITAÇÃO DE EXAMES" subtitle="Requisição de análises e exames de imagem" />
+                <textarea
+                  className="record-textarea"
+                  placeholder={`- Hemograma completo\n- Proteína C Reativa (PCR)\n- Raio-X de Tórax (PA)`}
+                  value={exams}
+                  onChange={e => setExams(e.target.value)}
                   style={{ flex: 1, minHeight: '180px' }}
                 />
               </div>
             )}
 
-            {activeTab === 'exames' && (
-              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                <TabHeader
-                  title="SOLICITAÇÃO DE EXAMES COMPLEMENTARES"
-                  subtitle="Impresso juntamente com o receituário"
-                />
-                <textarea
-                  className="record-textarea"
-                  placeholder={`Solicito os seguintes exames:\n- Hemograma completo\n- Raio-X de Tórax (AP e Perfil)`}
-                  value={exams}
-                  onChange={e => setExams(e.target.value)}
-                  style={{ flex: 1, minHeight: '220px' }}
-                />
-              </div>
-            )}
-
             {activeTab === 'historico' && (
-              <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '0.75rem' }}>
-                <h3 style={{ fontSize: '0.95rem', margin: 0, fontWeight: 800, color: '#1e293b' }}>
-                  HISTÓRICO CLÍNICO ANTERIOR
-                </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '0.75rem', flex: 1 }}>
+                <TabHeader title="HISTÓRICO DO PACIENTE" subtitle="Histórico de passagens anteriores na clínica" />
+                
                 {historyRecord.consultations?.length === 0 && historyRecord.atestados?.length === 0 ? (
                   <div style={{
-                    padding: '3rem', textAlign: 'center', color: '#94a3b8',
-                    background: '#f8fafc', borderRadius: '1rem', border: '1px solid #e2e8f0'
+                    padding: '2.5rem', textAlign: 'center', color: '#94a3b8',
+                    background: '#f8fafc', borderRadius: '0.85rem', border: '1px solid #e2e8f0', fontSize: '0.85rem'
                   }}>
-                    Nenhum atendimento anterior registrado.
+                    Sem registros anteriores cadastrados.
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                     {historyRecord.consultations?.map((item: any) => (
                       <div key={item.id} style={{
-                        padding: '0.85rem 1rem', background: '#f8fafc',
+                        padding: '0.75rem 0.85rem', background: '#f8fafc',
                         borderRadius: '0.75rem', border: '1px solid #e2e8f0'
                       }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', fontWeight: 700, color: '#2563eb' }}>
-                          <span>Consulta por {item.doctor_name || 'Médico'}</span>
+                        <div style={{ display: 'flex', justifySelf: 'stretch', justifyContent: 'space-between', fontSize: '0.78rem', fontWeight: 700, color: '#2563eb', marginBottom: '0.2rem' }}>
+                          <span>Atendimento Clínico</span>
                           <span>{new Date(item.created_at).toLocaleDateString('pt-BR')}</span>
                         </div>
                         {item.notes && (
-                          <div style={{ fontSize: '0.82rem', color: '#475569', marginTop: '0.3rem', lineHeight: 1.4 }}>
-                            {item.notes.substring(0, 120)}{item.notes.length > 120 ? '...' : ''}
+                          <div style={{ fontSize: '0.8rem', color: '#475569', lineHeight: 1.4 }}>
+                            {item.notes.substring(0, 100)}{item.notes.length > 100 ? '...' : ''}
                           </div>
                         )}
                       </div>
@@ -467,53 +601,52 @@ const ConsultationRoom: React.FC = () => {
                 )}
               </div>
             )}
+
           </div>
 
-          {/* Barra de ação inferior */}
+          {/* Action Bar Inferior no Painel */}
           <div style={{
-            padding: '1rem 1.25rem',
+            padding: '1rem',
             background: '#f1f5f9',
             borderTop: '1px solid #e2e8f0',
             display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
+            flexDirection: 'column',
+            gap: '0.5rem',
             flexShrink: 0
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#64748b', fontSize: '0.82rem' }}>
-              <ShieldCheck size={16} color="#10b981" />
-              <span>Documentos salvos com assinatura digital no PostgreSQL</span>
-            </div>
-
             <button
               onClick={() => setShowConfirmModal(true)}
               disabled={loading || savedSuccess}
               style={{
+                width: '100%',
                 background: savedSuccess
-                  ? 'linear-gradient(135deg, #059669, #10b981)'
+                  ? '#059669'
                   : 'linear-gradient(135deg, #e11d48, #f43f5e)',
                 color: 'white', border: 'none',
-                padding: '0.8rem 1.5rem', borderRadius: '0.85rem',
-                fontWeight: 800, fontSize: '0.9rem',
+                padding: '0.85rem', borderRadius: '0.75rem',
+                fontWeight: 800, fontSize: '0.88rem',
                 cursor: (loading || savedSuccess) ? 'not-allowed' : 'pointer',
-                display: 'flex', alignItems: 'center', gap: '0.5rem',
-                transition: 'all 0.2s ease',
-                boxShadow: savedSuccess
-                  ? '0 8px 20px rgba(16,185,129,0.35)'
-                  : '0 8px 20px rgba(244,63,94,0.35)',
-                opacity: loading ? 0.7 : 1
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                boxShadow: '0 4px 12px rgba(225, 29, 72, 0.25)',
+                transition: 'all 0.2s'
               }}
             >
               {loading ? (
-                <><Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /><span>GERANDO...</span></>
+                <><Loader2 size={16} className="animate-spin" /><span>PROCESSANDO...</span></>
               ) : savedSuccess ? (
-                <><CheckCircle2 size={18} /><span>FINALIZADO!</span></>
+                <><CheckCircle2 size={16} /><span>FINALIZADO!</span></>
               ) : (
-                <><Save size={18} /><span>FINALIZAR E EMITIR DOCUMENTOS</span></>
+                <><Save size={16} /><span>FINALIZAR E ENVIAR RECEITA</span></>
               )}
             </button>
+            <div style={{ display: 'flex', alignItems: 'center', justifySelf: 'center', justifyContent: 'center', gap: '0.35rem', color: '#64748b', fontSize: '0.7rem' }}>
+              <ShieldCheck size={14} color="#10b981" />
+              <span>Assinatura Digital integrada via banco e Soluti</span>
+            </div>
           </div>
+
         </div>
-      </main>
+      </div>
 
       {/* ─── Modal de Confirmação Premium ─── */}
       {showConfirmModal && (
@@ -525,7 +658,7 @@ const ConsultationRoom: React.FC = () => {
           padding: '1.5rem', animation: 'fadeIn 0.2s ease'
         }}>
           <div style={{
-            maxWidth: '460px', width: '100%',
+            maxWidth: '440px', width: '100%',
             background: 'linear-gradient(135deg, #1e293b, #0f172a)',
             borderRadius: '1.5rem',
             border: '1px solid rgba(255,255,255,0.1)',
@@ -533,18 +666,18 @@ const ConsultationRoom: React.FC = () => {
             overflow: 'hidden',
             animation: 'scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
           }}>
-            {/* Header do modal */}
+            {/* Header */}
             <div style={{
               padding: '1.5rem 1.5rem 1rem',
               borderBottom: '1px solid rgba(255,255,255,0.06)',
               display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start'
             }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 900, color: 'white' }}>
-                  Finalizar Atendimento?
+                <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 900, color: 'white' }}>
+                  Concluir Teleconsulta?
                 </h3>
-                <p style={{ margin: '0.3rem 0 0', color: '#94a3b8', fontSize: '0.85rem' }}>
-                  Os seguintes documentos serão gerados automaticamente:
+                <p style={{ margin: '0.3rem 0 0', color: '#94a3b8', fontSize: '0.8rem' }}>
+                  Os seguintes itens serão disponibilizados:
                 </p>
               </div>
               <button
@@ -555,26 +688,27 @@ const ConsultationRoom: React.FC = () => {
               </button>
             </div>
 
-            {/* Lista de documentos */}
-            <div style={{ padding: '1rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+            {/* Lista */}
+            <div style={{ padding: '1rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               {[
-                { icon: '📋', label: 'Evolução Clínica / Anamnese', active: !!notes },
-                { icon: '💊', label: 'Receituário Médico', active: !!prescriptionContent },
-                { icon: '🔬', label: 'Solicitação de Exames', active: !!exams },
-                { icon: '📄', label: `Atestado de ${daysOff} dia(s)`, active: !!atestadoContent },
+                { icon: '📋', label: 'Evolução e Anamnese de Prontuário', active: !!notes },
+                { icon: '💊', label: 'Receituário de Medicamentos', active: !!prescriptionContent },
+                { icon: '🔬', label: 'Solicitações de Exames', active: !!exams },
+                { icon: '📄', label: `Atestado de Afastamento (${daysOff} dias)`, active: !!atestadoContent },
+                { icon: '📱', label: 'Assinatura Digital (Soluti BirdID)', active: birdIdStatus === 'signed' },
               ].map((doc, i) => (
                 <div key={i} style={{
-                  display: 'flex', alignItems: 'center', gap: '0.75rem',
-                  padding: '0.6rem 0.85rem', borderRadius: '0.65rem',
+                  display: 'flex', alignItems: 'center', gap: '0.65rem',
+                  padding: '0.5rem 0.75rem', borderRadius: '0.5rem',
                   background: doc.active ? 'rgba(16, 185, 129, 0.08)' : 'rgba(255,255,255,0.03)',
                   border: `1px solid ${doc.active ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.05)'}`
                 }}>
-                  <span style={{ fontSize: '1rem' }}>{doc.icon}</span>
-                  <span style={{ fontSize: '0.85rem', color: doc.active ? '#a7f3d0' : '#475569', fontWeight: 600 }}>
+                  <span style={{ fontSize: '0.9rem' }}>{doc.icon}</span>
+                  <span style={{ fontSize: '0.8rem', color: doc.active ? '#a7f3d0' : '#64748b', fontWeight: 600 }}>
                     {doc.label}
                   </span>
                   {doc.active && (
-                    <CheckCircle2 size={14} color="#10b981" style={{ marginLeft: 'auto' }} />
+                    <CheckCircle2 size={12} color="#10b981" style={{ marginLeft: 'auto' }} />
                   )}
                 </div>
               ))}
@@ -583,13 +717,13 @@ const ConsultationRoom: React.FC = () => {
             {/* Aviso */}
             <div style={{
               margin: '0 1.5rem',
-              padding: '0.75rem 1rem',
-              background: 'rgba(244, 63, 94, 0.08)',
-              border: '1px solid rgba(244, 63, 94, 0.2)',
-              borderRadius: '0.65rem',
-              fontSize: '0.8rem', color: '#fda4af', lineHeight: 1.4
+              padding: '0.65rem 0.85rem',
+              background: 'rgba(244, 63, 94, 0.06)',
+              border: '1px solid rgba(244, 63, 94, 0.15)',
+              borderRadius: '0.5rem',
+              fontSize: '0.75rem', color: '#fda4af', lineHeight: 1.3
             }}>
-              ⚠️ Esta ação encerrará a sessão de vídeo e notificará o paciente em tempo real.
+              ⚠️ O paciente receberá a receita e o atestado na tela dele instantaneamente via WebSocket.
             </div>
 
             {/* Botões */}
@@ -599,11 +733,11 @@ const ConsultationRoom: React.FC = () => {
                 style={{
                   flex: 1, background: 'rgba(255,255,255,0.05)',
                   border: '1px solid rgba(255,255,255,0.1)',
-                  color: '#94a3b8', padding: '0.85rem', borderRadius: '0.85rem',
-                  fontWeight: 700, cursor: 'pointer', fontSize: '0.9rem'
+                  color: '#94a3b8', padding: '0.75rem', borderRadius: '0.75rem',
+                  fontWeight: 700, cursor: 'pointer', fontSize: '0.85rem'
                 }}
               >
-                Cancelar
+                Voltar
               </button>
               <button
                 onClick={handleEndConsultation}
@@ -611,13 +745,13 @@ const ConsultationRoom: React.FC = () => {
                   flex: 2,
                   background: 'linear-gradient(135deg, #e11d48, #f43f5e)',
                   color: 'white', border: 'none',
-                  padding: '0.85rem', borderRadius: '0.85rem',
-                  fontWeight: 800, cursor: 'pointer', fontSize: '0.9rem',
-                  boxShadow: '0 8px 20px rgba(244, 63, 94, 0.4)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem'
+                  padding: '0.75rem', borderRadius: '0.75rem',
+                  fontWeight: 800, cursor: 'pointer', fontSize: '0.85rem',
+                  boxShadow: '0 4px 12px rgba(244, 63, 94, 0.3)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem'
                 }}
               >
-                <Save size={16} /> Confirmar e Finalizar
+                Concluir Atendimento
               </button>
             </div>
           </div>
@@ -627,19 +761,20 @@ const ConsultationRoom: React.FC = () => {
       <style>{`
         .record-textarea {
           width: 100%; border: 1px solid #cbd5e1; background: #ffffff;
-          border-radius: 0.85rem; padding: 1rem; font-size: 0.95rem;
-          line-height: 1.6; color: #0f172a; resize: none; outline: none;
-          transition: all 0.2s ease; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+          border-radius: 0.75rem; padding: 0.85rem; font-size: 0.9rem;
+          line-height: 1.5; color: #0f172a; resize: none; outline: none;
+          transition: all 0.2s ease; box-shadow: inset 0 1px 3px rgba(0,0,0,0.02);
           box-sizing: border-box; font-family: 'Inter', sans-serif;
         }
-        .record-textarea:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.12); }
-        .input-group label { display: block; font-size: 0.6rem; font-weight: 900; color: #64748b; margin-bottom: 0.25rem; letter-spacing: 0.05em; }
-        .input-group input { padding: 0.55rem 0.75rem; border-radius: 0.5rem; border: 1px solid #cbd5e1; font-weight: 700; width: 110px; outline: none; background: white; color: #0f172a; font-size: 0.85rem; }
-        .input-group input:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.12); }
+        .record-textarea:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+        .input-group label { display: block; font-size: 0.58rem; font-weight: 900; color: #64748b; margin-bottom: 0.2rem; letter-spacing: 0.05em; }
+        .input-group input { padding: 0.45rem 0.6rem; border-radius: 0.4rem; border: 1px solid #cbd5e1; font-weight: 700; outline: none; background: white; color: #0f172a; font-size: 0.8rem; }
+        .input-group input:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+        .animate-spin { animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes pulse-dot { 0%, 100% { opacity: 1; box-shadow: 0 0 10px #10b981; } 50% { opacity: 0.6; box-shadow: 0 0 20px #10b981; } }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes scaleIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        @keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
       `}</style>
     </div>
   );
@@ -650,19 +785,19 @@ const ConsultationRoom: React.FC = () => {
 const TabHeader = ({ title, subtitle, subtitleColor = '#64748b' }: {
   title: string; subtitle: string; subtitleColor?: string
 }) => (
-  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexShrink: 0 }}>
-    <h3 style={{ fontSize: '0.9rem', margin: 0, fontWeight: 800, color: '#1e293b' }}>{title}</h3>
-    <span style={{ fontSize: '0.7rem', color: subtitleColor, fontWeight: 700 }}>{subtitle}</span>
+  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem', flexShrink: 0 }}>
+    <h3 style={{ fontSize: '0.82rem', margin: 0, fontWeight: 800, color: '#1e293b' }}>{title}</h3>
+    <span style={{ fontSize: '0.68rem', color: subtitleColor, fontWeight: 700 }}>{subtitle}</span>
   </div>
 );
 
 const InfoBadge = ({ label, value }: { label: string; value: string }) => (
   <div style={{
-    background: 'rgba(255,255,255,0.04)', padding: '0.55rem 0.75rem',
-    borderRadius: '0.6rem', border: '1px solid rgba(255,255,255,0.06)'
+    background: '#ffffff', padding: '0.45rem 0.65rem',
+    borderRadius: '0.5rem', border: '1px solid #e2e8f0', flex: 1
   }}>
-    <div style={{ fontSize: '0.6rem', fontWeight: 900, color: '#94a3b8', letterSpacing: '0.05em', marginBottom: '0.1rem' }}>{label}</div>
-    <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#f8fafc' }}>{value}</div>
+    <div style={{ fontSize: '0.55rem', fontWeight: 900, color: '#64748b', letterSpacing: '0.05em', marginBottom: '0.1rem' }}>{label}</div>
+    <div style={{ fontWeight: 800, fontSize: '0.8rem', color: '#1e293b' }}>{value}</div>
   </div>
 );
 
@@ -672,11 +807,11 @@ const RecordTab = ({ active, onClick, icon, label }: {
   <button
     onClick={onClick}
     style={{
-      padding: '0.85rem 1rem', border: 'none', background: 'none',
+      padding: '0.75rem 0.85rem', border: 'none', background: 'none',
       color: active ? '#2563eb' : '#64748b',
-      fontWeight: 800, fontSize: '0.7rem', cursor: 'pointer',
-      display: 'flex', alignItems: 'center', gap: '0.4rem',
-      borderBottom: `2px solid ${active ? '#2563eb' : 'transparent'}`,
+      fontWeight: 800, fontSize: '0.68rem', cursor: 'pointer',
+      display: 'flex', alignItems: 'center', gap: '0.35rem',
+      borderBottom: `2.5px solid ${active ? '#2563eb' : 'transparent'}`,
       transition: 'all 0.2s ease', whiteSpace: 'nowrap'
     }}
   >

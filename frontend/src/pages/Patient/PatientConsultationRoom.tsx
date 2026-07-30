@@ -301,40 +301,6 @@ const PatientConsultationRoom = () => {
           </div>
         )}
       </div>
-
-      {/* Overlay de Branding (sobre o vídeo, abaixo do self-view PiP) */}
-      {/* O self-view já está no canto superior esquerdo DENTRO do VideoSDKVideo */}
-      {/* Este overlay fica na direita do topo para não colidir com o PiP */}
-      <div style={{
-        position: 'absolute',
-        top: '1rem',
-        right: '1rem',
-        zIndex: 25,
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.75rem',
-        background: 'rgba(9, 13, 22, 0.8)',
-        padding: '0.6rem 1rem',
-        borderRadius: '0.85rem',
-        backdropFilter: 'blur(12px)',
-        border: '1px solid rgba(255,255,255,0.08)',
-        boxShadow: '0 8px 16px rgba(0,0,0,0.3)'
-      }}>
-        <div style={{
-          width: '28px', height: '28px',
-          background: 'linear-gradient(135deg, #2563eb, #38bdf8)',
-          borderRadius: '50%',
-          display: 'flex', alignItems: 'center', justifyContent: 'center'
-        }}>
-          <HeartPulse size={15} color="white" />
-        </div>
-        <div>
-          <div style={{ color: 'white', fontSize: '0.75rem', fontWeight: 800 }}>CONSULTA SEGURA</div>
-          <div style={{ color: '#10b981', fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.04em' }}>
-            Dr(a). {doctorName}
-          </div>
-        </div>
-      </div>
     </div>
   );
 };

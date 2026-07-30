@@ -11,4 +11,9 @@ router.post('/end-consultation', authenticateToken, authorizeDoctor, doctorContr
 router.get('/validate-document/:code', validateLimiter, doctorController.validateDocument);
 router.get('/doctor/stats/:id', authenticateToken, authorizeDoctor, doctorController.getDoctorStats);
 
+// BirdID digital signature validation routes
+router.post('/birdid/start', authenticateToken, authorizeDoctor, doctorController.startBirdIdFlow);
+router.get('/birdid/status/:sessionId', authenticateToken, authorizeDoctor, doctorController.checkBirdIdStatus);
+
+
 export default router;

@@ -3,6 +3,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { documentQueue } from '../queue';
 import { prisma } from '../utils/db';
 import { emitConsultationEnded } from '../websocket';
+import { BirdIdService } from '../birdid';
+
 
 /**
  * [Princípio de Responsabilidade Única - SRP]
@@ -112,7 +114,8 @@ export const endConsultation = async (req: Request, res: Response) => {
           validationCode: atestadoCode,
           daysOff: atestado.daysOff,
           cid: atestado.cid,
-          content: atestado.content
+          content: atestado.content,
+          birdIdSession: atestado.birdIdSession
         }
       });
     }
@@ -240,3 +243,55 @@ export const getDoctorStats = async (req: Request, res: Response) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+/**
+ * Inicia o fluxo de assinatura digital via Soluti BirdID.
+ */
+export const startBirdIdFlow = async (req: any, res: Response) => {
+  try {
+    const doctorId = req.user.id;
+    const { cpf } = req.body;
+
+    const doctor = await prisma.doctor.findUnique({
+      where: { id: doctorId }
+    });
+
+    const targetCpf = cpf || doctor?.cpf;
+    if (!targetCpf) {
+      return res.status(400).json({ error: 'CPF do médico é obrigatório para iniciar a assinatura digital.' });
+    }
+
+    const cleanCpf = targetCpf.replace(/\D/g, '');
+
+    // Se o médico não tinha CPF salvo ou se mudou, atualiza no banco
+    if (doctor && doctor.cpf !== cleanCpf) {
+      await prisma.doctor.update({
+        where: { id: doctorId },
+        data: { cpf: cleanCpf }
+      });
+    }
+
+    const sessionId = await BirdIdService.startSignatureFlow(cleanCpf);
+    if (!sessionId) {
+      return res.status(500).json({ error: 'Falha ao iniciar fluxo de assinatura Bird ID no parceiro.' });
+    }
+
+    res.json({ success: true, sessionId });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/**
+ * Verifica o status da assinatura digital do BirdID via session_id.
+ */
+export const checkBirdIdStatus = async (req: Request, res: Response) => {
+  try {
+    const { sessionId } = req.params;
+    const status = await BirdIdService.checkSignatureStatus(sessionId as string);
+    res.json({ success: true, status });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
