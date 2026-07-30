@@ -82,12 +82,17 @@ services:
       args:
         VITE_API_URL: ${VITE_API_URL:-http://localhost}
         VITE_LIVEKIT_URL: ${VITE_LIVEKIT_URL:-ws://localhost:7880}
+        VITE_VIDEOSDK_TOKEN: ${VITE_VIDEOSDK_TOKEN:-}
+        VITE_TURN_SERVER: ${VITE_TURN_SERVER:-}
+        VITE_TURN_USERNAME: ${COTURN_USER:-user}
+        VITE_TURN_PASSWORD: ${COTURN_PASSWORD:-password}
     container_name: medpronto_frontend
     restart: always
     networks:
       - medpronto_network
     depends_on:
       - backend
+
 
   # 6. Gateway HTTPS SSL Automático (Caddy)
   caddy:
