@@ -29,5 +29,9 @@ export const config = {
     url: process.env.LIVEKIT_URL || 'ws://localhost:7880',
     apiKey: process.env.LIVEKIT_API_KEY || 'devkey',
     apiSecret: process.env.LIVEKIT_API_SECRET || 'secretsecretsecretsecretsecretsecret',
+  },
+  videosdk: {
+    apiKey: process.env.VIDEOSDK_API_KEY || 'd2f52d5e-33f2-4aa1-bf47-d8f0bca7c8c6',
+    secretKey: process.env.VIDEOSDK_SECRET_KEY || 'b1bf44bb469c610c009c9af4d6b0144db9a18a17c7b040c777c1662a14c91980',
   }
 };

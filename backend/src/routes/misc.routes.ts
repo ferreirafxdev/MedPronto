@@ -128,5 +128,26 @@ router.get('/doctor/patient/:patientId/record', authenticateToken, async (req: a
   }
 });
 
+// Endpoint para geração dinâmica e sob demanda de Tokens de Videochamada (VideoSDK)
+router.get('/videosdk/token', authenticateToken, (req, res) => {
+  try {
+    const jwt = require('jsonwebtoken');
+    const payload = {
+      apikey: config.videosdk.apiKey,
+      permissions: ['allow_join'],
+      version: 2,
+    };
+    
+    // Gera token válido por 24 horas usando o segredo HMAC-SHA256
+    const token = jwt.sign(payload, config.videosdk.secretKey, {
+      algorithm: 'HS256',
+      expiresIn: '24h'
+    });
+    
+    res.json({ token });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Erro ao gerar token: ' + err.message });
+  }
+});
 
 export default router;

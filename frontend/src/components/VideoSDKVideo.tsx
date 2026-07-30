@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Mic, MicOff, Video, VideoOff, PhoneOff, Loader2, AlertCircle, Wifi, WifiOff } from 'lucide-react';
+import apiClient from '../api/client';
 
 const VIDEOSDK_TOKEN = import.meta.env.VITE_VIDEOSDK_TOKEN || '';
 const VIDEOSDK_API = 'https://api.videosdk.live/v2';
@@ -68,11 +69,11 @@ const VideoSDKVideo: React.FC<VideoSDKVideoProps> = ({
   }, []);
 
   // Cria a sala no VideoSDK se não existir
-  const createMeetingRoom = useCallback(async (): Promise<string> => {
+  const createMeetingRoom = useCallback(async (token: string): Promise<string> => {
     const response = await fetch(`${VIDEOSDK_API}/rooms`, {
       method: 'POST',
       headers: {
-        Authorization: VIDEOSDK_TOKEN,
+        Authorization: token,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ roomId })
@@ -123,8 +124,19 @@ const VideoSDKVideo: React.FC<VideoSDKVideoProps> = ({
     setState('joining');
     setError(null);
 
-    if (!VIDEOSDK_TOKEN) {
-      setError('Chave de autenticação da videochamada (VideoSDK Token) não configurada no ambiente.');
+    let activeToken = VIDEOSDK_TOKEN;
+    if (!activeToken) {
+      try {
+        console.log('[VideoSDK] Buscando token dinamicamente no backend...');
+        const res = await apiClient.get('/api/videosdk/token');
+        activeToken = res.data.token;
+      } catch (err: any) {
+        console.warn('[VideoSDK] Falha ao obter token do backend:', err);
+      }
+    }
+
+    if (!activeToken) {
+      setError('Chave de autenticação da videochamada (VideoSDK Token) não configurada no ambiente nem na API.');
       setState('error');
       return;
     }
@@ -134,11 +146,11 @@ const VideoSDKVideo: React.FC<VideoSDKVideoProps> = ({
       sdkRef.current = VideoSDK;
 
       // Configura o Token globalmente no VideoSDK como exigido pelo JS SDK
-      VideoSDK.config(VIDEOSDK_TOKEN);
+      VideoSDK.config(activeToken);
 
       // Tenta criar/validar a sala
       try {
-        await createMeetingRoom();
+        await createMeetingRoom(activeToken);
       } catch (e) {
         // Ignora erro de criação (sala pode já existir)
       }

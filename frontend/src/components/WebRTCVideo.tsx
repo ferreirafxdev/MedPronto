@@ -7,13 +7,14 @@ interface WebRTCVideoProps {
   role: 'doctor' | 'patient';
   userName?: string;
   onLeave?: () => void;
+  onMeetingEnd?: () => void;
 }
 
 /**
  * Componente de Vídeo WebRTC Nativo (Peer-to-Peer) com Signaling via Socket.io
  * Substitui completamente a dependência de plataformas externas (Daily.co / LiveKit)
  */
-const WebRTCVideo: React.FC<WebRTCVideoProps> = ({ roomId, role, userName, onLeave }) => {
+const WebRTCVideo: React.FC<WebRTCVideoProps> = ({ roomId, role, userName, onLeave, onMeetingEnd }) => {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   
@@ -121,13 +122,16 @@ const WebRTCVideo: React.FC<WebRTCVideoProps> = ({ roomId, role, userName, onLea
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = null;
       }
+      if (onMeetingEnd) {
+        onMeetingEnd();
+      }
     });
 
     return () => {
       isMounted = false;
       cleanup();
     };
-  }, [roomId, role]);
+  }, [roomId, role, onMeetingEnd]);
 
   /**
    * Cria e configura a RTCPeerConnection
