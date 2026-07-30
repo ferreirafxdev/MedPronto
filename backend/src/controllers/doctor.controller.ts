@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { documentQueue } from '../queue';
 import { prisma } from '../utils/db';
+import { emitConsultationEnded } from '../websocket';
 
 /**
  * [Princípio de Responsabilidade Única - SRP]
@@ -45,15 +46,26 @@ export const createAtestado = async (req: Request, res: Response) => {
 };
 
 /**
- * Finaliza a consulta médica, salvando evolução, receitas e opcionalmente o atestado.
- * [Padrão Transaction Script] - Executa várias operações de banco de forma sequencial para garantir o fluxo.
+ * Finaliza a consulta médica COMPLETAMENTE DE FORMA AUTOMÁTICA:
+ * 1. Salva evolução clínica/anamnese no prontuário
+ * 2. Gera atestado médico automaticamente (sem aprovação manual)
+ * 3. Gera receituário/evolução como documento
+ * 4. Remove da fila + consome pagamento
+ * 5. Emite evento WebSocket em tempo real para o paciente
+ * 6. Retorna URLs dos documentos para exibição imediata
+ * 
+ * [Padrão Transaction Script] - Operações sequenciais para garantir consistência
  */
 export const endConsultation = async (req: Request, res: Response) => {
   try {
     const { patientId, doctorId, notes, prescriptions, exams, content, atestado } = req.body;
     const consultationCode = `MP-R-${uuidv4().substring(0, 8).toUpperCase()}`;
 
-    // 1. Salva a Consulta/Prontuário
+    // Busca dados do médico para os documentos
+    const doctor = await prisma.doctor.findUnique({ where: { id: doctorId } });
+    const patient = await prisma.patient.findUnique({ where: { id: patientId } });
+
+    // 1. Salva a Consulta/Prontuário (Evolução + Receituário)
     await prisma.consultation.create({
       data: {
         patient_id: patientId,
@@ -66,11 +78,16 @@ export const endConsultation = async (req: Request, res: Response) => {
       }
     });
 
-    // 2. Salva o Atestado (se os dados foram preenchidos na aba de atestado)
+    // 2. Gera documento da consulta na fila (PDF assíncrono)
+    await documentQueue.add('process-consultation', {
+      type: 'GENERATE_CONSULTATION',
+      data: { patientId, doctorId, validationCode: consultationCode, notes, prescriptions, exams, content }
+    });
+
+    // 3. Salva o Atestado automaticamente (se os dados foram preenchidos)
+    let atestadoCode: string | null = null;
     if (atestado && (atestado.content || atestado.daysOff)) {
-      const atestadoCode = `MP-A-${uuidv4().substring(0, 8).toUpperCase()}`;
-      
-      const doctor = await prisma.doctor.findUnique({ where: { id: doctorId } });
+      atestadoCode = `MP-A-${uuidv4().substring(0, 8).toUpperCase()}`;
 
       await prisma.atestado.create({
         data: {
@@ -80,7 +97,7 @@ export const endConsultation = async (req: Request, res: Response) => {
           days_off: parseInt(atestado.daysOff) || 1,
           cid: atestado.cid,
           content: atestado.content,
-          patient_name: '', // Será atualizado pelo worker ou via join futuramente
+          patient_name: patient?.name || '',
           doctor_name: doctor?.name || '',
           doctor_crm: doctor?.crm || ''
         }
@@ -89,30 +106,57 @@ export const endConsultation = async (req: Request, res: Response) => {
       // Enfileira geração de PDF do atestado
       await documentQueue.add('process-atestado', {
         type: 'GENERATE_ATESTADO',
-        data: { patientId, doctorId, validationCode: atestadoCode, daysOff: atestado.daysOff, cid: atestado.cid, content: atestado.content }
+        data: {
+          patientId,
+          doctorId,
+          validationCode: atestadoCode,
+          daysOff: atestado.daysOff,
+          cid: atestado.cid,
+          content: atestado.content
+        }
       });
     }
 
-    // 3. Processa Documento da Consulta (Receituário/Evolução)
-    await documentQueue.add('process-consultation', {
-      type: 'GENERATE_CONSULTATION',
-      data: { patientId, doctorId, validationCode: consultationCode, notes, prescriptions, exams, content }
-    });
-
-    // Remove o paciente da fila de espera
-    await prisma.queue.deleteMany({
-      where: { patient_id: patientId }
-    });
-    
-    // Consome o pagamento do paciente (exige um novo pagamento para realizar outra consulta)
+    // 4. Remove paciente da fila + consome o pagamento
+    await prisma.queue.deleteMany({ where: { patient_id: patientId } });
     await prisma.patient.update({
       where: { id: patientId },
       data: { has_active_payment: false }
     });
 
-    res.json({ success: true, message: 'Finalizado' });
+    // 5. Emite evento WebSocket em TEMPO REAL para o paciente
+    //    O paciente recebe instantaneamente os dados da consulta sem precisar fazer polling
+    emitConsultationEnded(patientId, {
+      atestado: atestadoCode ? {
+        code: atestadoCode,
+        content: atestado?.content || '',
+        daysOff: parseInt(atestado?.daysOff) || 1,
+        cid: atestado?.cid
+      } : undefined,
+      consultation: {
+        code: consultationCode,
+        notes: notes || '',
+        prescriptions: prescriptions || '',
+        exams: exams || ''
+      },
+      doctorName: doctor?.name || 'Médico'
+    });
+
+    // 6. Retorna resposta com os dados dos documentos gerados
+    res.json({
+      success: true,
+      message: 'Consulta finalizada e documentos gerados automaticamente',
+      documents: {
+        consultationCode,
+        atestadoCode,
+        doctorName: doctor?.name,
+        patientName: patient?.name,
+        generatedAt: new Date().toISOString()
+      }
+    });
 
   } catch (err: any) {
+    console.error('[Doctor] Erro ao finalizar consulta:', err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -138,9 +182,9 @@ export const validateDocument = async (req: Request, res: Response) => {
     ]);
 
     if (atestadoDoc) {
-      return res.json({ 
-        success: true, 
-        type: 'ATESTADO', 
+      return res.json({
+        success: true,
+        type: 'ATESTADO',
         document: {
           patientName: atestadoDoc.patient?.name || atestadoDoc.patient_name,
           doctorName: atestadoDoc.doctor?.name || atestadoDoc.doctor_name,
@@ -152,9 +196,9 @@ export const validateDocument = async (req: Request, res: Response) => {
     }
 
     if (consultationDoc) {
-      return res.json({ 
-        success: true, 
-        type: 'RECEITA', 
+      return res.json({
+        success: true,
+        type: 'RECEITA',
         document: {
           patientName: consultationDoc.patient?.name,
           doctorName: consultationDoc.doctor?.name,
@@ -177,17 +221,15 @@ export const validateDocument = async (req: Request, res: Response) => {
 export const getDoctorStats = async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
-    
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     // Conta quantas consultas o médico realizou hoje
     const totalConsultations = await prisma.consultation.count({
       where: {
         doctor_id: id,
-        created_at: {
-          gte: today
-        }
+        created_at: { gte: today }
       }
     });
 

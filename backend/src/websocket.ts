@@ -2,10 +2,13 @@ import { Server as HttpServer } from 'http';
 import { Server, Socket } from 'socket.io';
 import { config } from './config';
 
+// Exportamos o io para ser usado em outros módulos (ex: doctor.controller)
+export let io: Server;
+
 export function initializeWebSocket(httpServer: HttpServer) {
-  const io = new Server(httpServer, {
+  io = new Server(httpServer, {
     cors: {
-      origin: config.corsOrigin,
+      origin: (origin, callback) => callback(null, true),
       methods: ['GET', 'POST'],
       credentials: true
     }
@@ -14,28 +17,24 @@ export function initializeWebSocket(httpServer: HttpServer) {
   io.on('connection', (socket: Socket) => {
     console.log(`🔌 Nova conexão WebSocket: ${socket.id}`);
 
-    // Um usuário quer entrar em uma sala de consulta
-    socket.on('join-room', ({ roomId, role }) => {
+    // Usuário entra em uma sala de consulta (identificada pelo patientId)
+    socket.on('join-room', ({ roomId, role }: { roomId: string; role: string }) => {
       console.log(`👤 ${role} entrando na sala ${roomId} via Socket ${socket.id}`);
       socket.join(roomId);
-      
-      // Notifica os outros participantes que alguém entrou
       socket.to(roomId).emit('user-joined', { socketId: socket.id, role });
     });
 
-    // Envio do Sinal P2P (Offer, Answer, Candidate)
-    socket.on('signal', ({ roomId, signal, to }) => {
-      // Se houver um destinatário específico
+    // Sinalização WebRTC P2P (fallback)
+    socket.on('signal', ({ roomId, signal, to }: { roomId: string; signal: any; to?: string }) => {
       if (to) {
         io.to(to).emit('signal', { sender: socket.id, signal });
       } else {
-        // Envia para todos da sala exceto o remetente
         socket.to(roomId).emit('signal', { sender: socket.id, signal });
       }
     });
 
-    // Médico termina a chamada ou recusa paciente
-    socket.on('end-call', ({ roomId }) => {
+    // Médico encerra a chamada via socket
+    socket.on('end-call', ({ roomId }: { roomId: string }) => {
       socket.to(roomId).emit('call-ended');
     });
 
@@ -45,4 +44,25 @@ export function initializeWebSocket(httpServer: HttpServer) {
   });
 
   return io;
+}
+
+/**
+ * Emite o evento de consulta finalizada para o paciente em tempo real.
+ * Chamado pelo doctor.controller após salvar todos os documentos.
+ */
+export function emitConsultationEnded(patientId: string, payload: {
+  atestado?: { code: string; content: string; daysOff: number; cid?: string };
+  consultation?: { code: string; notes: string; prescriptions: string; exams: string };
+  doctorName?: string;
+}) {
+  if (!io) {
+    console.warn('[WebSocket] io não inicializado ao tentar emitir consultation-ended');
+    return;
+  }
+  console.log(`📡 Emitindo consultation-ended para sala ${patientId}`);
+  io.to(patientId).emit('consultation-ended', {
+    patientId,
+    ...payload,
+    timestamp: new Date().toISOString()
+  });
 }
