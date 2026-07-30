@@ -40,6 +40,7 @@ const VideoSDKVideo: React.FC<VideoSDKVideoProps> = ({
   const meetingRef = useRef<any>(null);
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const sdkRef = useRef<any>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
 
@@ -98,6 +99,25 @@ const VideoSDKVideo: React.FC<VideoSDKVideoProps> = ({
     }
   }, []);
 
+  // Renderiza o stream de áudio de um participante no elemento de áudio
+  const renderParticipantAudio = useCallback((participant: any, audioEl: HTMLAudioElement | null) => {
+    if (!audioEl || !participant) return;
+    try {
+      const streams = participant.streams;
+      if (!streams) return;
+      const audioStream = streams.get('audio');
+      if (audioStream && audioStream.track) {
+        const mediaStream = new MediaStream([audioStream.track]);
+        audioEl.srcObject = mediaStream;
+        audioEl.play().catch((err) => {
+          console.warn('[VideoSDK] Erro ao reproduzir áudio:', err);
+        });
+      }
+    } catch (e) {
+      console.warn('[VideoSDK] Erro ao renderizar áudio:', e);
+    }
+  }, []);
+
   // Inicializa e entra na meeting
   const joinMeeting = useCallback(async () => {
     setState('joining');
@@ -131,10 +151,43 @@ const VideoSDKVideo: React.FC<VideoSDKVideoProps> = ({
         console.log('[VideoSDK] Meeting joined:', roomId);
         setState('joined');
 
-        // Renderiza self-view
+        // Renderiza self-view local
         if (meeting.localParticipant) {
           renderParticipantVideo(meeting.localParticipant, localVideoRef.current);
+          meeting.localParticipant.on('stream-enabled', (stream: any) => {
+            if (stream.kind === 'video') {
+              renderParticipantVideo(meeting.localParticipant, localVideoRef.current);
+            }
+          });
         }
+
+        // Renderiza participantes que já estavam na sala antes de entrarmos
+        meeting.participants.forEach((participant: any) => {
+          console.log('[VideoSDK] Participante pré-existente encontrado:', participant.id);
+          setRemoteParticipantId(participant.id);
+          
+          // Renderização inicial tardia segura (espera carregamento dos refs no DOM)
+          setTimeout(() => {
+            renderParticipantVideo(participant, remoteVideoRef.current);
+            renderParticipantAudio(participant, remoteAudioRef.current);
+          }, 800);
+
+          participant.on('stream-enabled', (stream: any) => {
+            if (stream.kind === 'video') {
+              renderParticipantVideo(participant, remoteVideoRef.current);
+            } else if (stream.kind === 'audio') {
+              renderParticipantAudio(participant, remoteAudioRef.current);
+            }
+          });
+
+          participant.on('stream-disabled', (stream: any) => {
+            if (stream.kind === 'video' && remoteVideoRef.current) {
+              remoteVideoRef.current.srcObject = null;
+            } else if (stream.kind === 'audio' && remoteAudioRef.current) {
+              remoteAudioRef.current.srcObject = null;
+            }
+          });
+        });
       });
 
       // Evento: meeting encerrada
@@ -156,19 +209,34 @@ const VideoSDKVideo: React.FC<VideoSDKVideoProps> = ({
         setState('error');
       });
 
-      // Evento: participante entrou
+      // Evento: participante entrou (em tempo real)
       meeting.on('participant-joined', (participant: any) => {
         console.log('[VideoSDK] Participante entrou:', participant.id);
         setParticipants(prev => new Map(prev.set(participant.id, participant)));
         setRemoteParticipantId(participant.id);
 
-        // Aguarda stream de vídeo do participante
+        // Renderiza streams imediatamente
+        setTimeout(() => {
+          renderParticipantVideo(participant, remoteVideoRef.current);
+          renderParticipantAudio(participant, remoteAudioRef.current);
+        }, 800);
+
+        // Aguarda stream de vídeo/áudio do participante
         participant.on('stream-enabled', (stream: any) => {
+          console.log('[VideoSDK] Stream habilitada:', stream.kind, 'para', participant.id);
           if (stream.kind === 'video') {
             renderParticipantVideo(participant, remoteVideoRef.current);
+          } else if (stream.kind === 'audio') {
+            renderParticipantAudio(participant, remoteAudioRef.current);
           }
-          if (stream.kind === 'audio') {
-            // Áudio é automático no VideoSDK
+        });
+
+        participant.on('stream-disabled', (stream: any) => {
+          console.log('[VideoSDK] Stream desabilitada:', stream.kind, 'para', participant.id);
+          if (stream.kind === 'video' && remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = null;
+          } else if (stream.kind === 'audio' && remoteAudioRef.current) {
+            remoteAudioRef.current.srcObject = null;
           }
         });
       });
@@ -183,6 +251,9 @@ const VideoSDKVideo: React.FC<VideoSDKVideoProps> = ({
         });
         if (remoteVideoRef.current) {
           remoteVideoRef.current.srcObject = null;
+        }
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = null;
         }
         setRemoteParticipantId(null);
         // Se médico sair, e for paciente, considera consulta encerrada
@@ -336,6 +407,14 @@ const VideoSDKVideo: React.FC<VideoSDKVideoProps> = ({
           objectFit: 'cover',
           background: '#111'
         }}
+      />
+
+      {/* ÁUDIO REMOTO */}
+      <audio
+        ref={remoteAudioRef}
+        autoPlay
+        playsInline
+        muted={false}
       />
 
       {/* Placeholder quando não há participante remoto */}
