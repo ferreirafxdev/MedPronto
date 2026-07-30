@@ -123,6 +123,12 @@ const VideoSDKVideo: React.FC<VideoSDKVideoProps> = ({
     setState('joining');
     setError(null);
 
+    if (!VIDEOSDK_TOKEN) {
+      setError('Chave de autenticação da videochamada (VideoSDK Token) não configurada no ambiente.');
+      setState('error');
+      return;
+    }
+
     try {
       const VideoSDK = await loadSDK();
       sdkRef.current = VideoSDK;
