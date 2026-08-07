@@ -1,10 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from '../../store/useStore';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../../api/client';
-import { Users, FileUser, PlayCircle, DollarSign, TrendingUp } from 'lucide-react';
+import { Users, PlayCircle, TrendingUp, Clock, AlertCircle, RefreshCw } from 'lucide-react';
 
-interface QueuedPatient { id: string; name: string; age: string; complaint: string; status: string; }
+interface QueuedPatient {
+  id: string;
+  name: string;
+  age: string;
+  complaint: string;
+  status: string;
+  created_at?: string;
+}
 
 const DoctorDashboard = () => {
   const { user, setConsultationRoomId } = useStore();
@@ -12,90 +19,148 @@ const DoctorDashboard = () => {
   const [queue, setQueue] = useState<QueuedPatient[]>([]);
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState({ totalConsultations: 0, earnings: 0 });
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    if (!user || user.role !== 'doctor') { navigate('/doctor/login'); return; }
-    const fetchData = async () => {
-      try {
-        const [qResp, sResp] = await Promise.all([apiClient.get('/api/queue'), apiClient.get(`/api/doctor/stats/${user.id}`)]);
-        if (qResp.data.success) setQueue(qResp.data.queue);
-        if (sResp.data.success) setStats(sResp.data.stats);
-      } catch (error) { console.error("Erro ao sincronizar dados", error); }
-    };
+    if (!user || user.role !== 'doctor') {
+      navigate('/doctor/login');
+      return;
+    }
     fetchData();
     const interval = setInterval(fetchData, 10000);
     return () => clearInterval(interval);
   }, [user, navigate]);
 
+  const fetchData = async () => {
+    try {
+      const [qResp, sResp] = await Promise.all([
+        apiClient.get('/api/queue'),
+        apiClient.get(`/api/doctor/stats/${user?.id}`)
+      ]);
+      if (qResp.data.success) setQueue(qResp.data.queue);
+      if (sResp.data.success) setStats(sResp.data.stats);
+    } catch (error) {
+      console.error('Erro ao sincronizar dados', error);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchData();
+    setTimeout(() => setRefreshing(false), 600);
+  };
+
   const takePatient = async () => {
     try {
       setLoading(true);
       const resp = await apiClient.post('/api/take-patient', { doctorId: user?.id });
-      if (resp.data.success) { setConsultationRoomId(resp.data.patient.id); navigate(`/doctor/consultation/${resp.data.patient.id}`); }
-    } catch (error) { alert("A fila está vazia ou ocorreu um erro."); }
-    finally { setLoading(false); }
+      if (resp.data.success) {
+        setConsultationRoomId(resp.data.patient.id);
+        navigate(`/doctor/consultation/${resp.data.patient.id}`);
+      }
+    } catch {
+      alert('A fila esta vazia ou ocorreu um erro.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="dashboard-container">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.75rem', flexWrap: 'wrap', gap: '1rem' }}>
+    <div className="max-w-[960px] mx-auto">
+      {/* Page Header */}
+      <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
         <div>
-          <h2 style={{ fontSize: '1.6rem', marginBottom: '0.2rem' }}>Painel Médico — <span className="text-gradient">{user?.name}</span></h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Gerencie seus atendimentos na fila do PS Online</p>
+          <h1 className="text-[1.375rem] font-semibold mb-0.5">Painel de Atendimento</h1>
+          <p className="text-[13px] text-[var(--color-text-secondary)]">
+            Gerencie a fila do pronto atendimento online
+          </p>
         </div>
-        <button onClick={takePatient} className="btn btn-primary btn-lg" disabled={loading}>
-          <PlayCircle size={20} /> Chamar Próximo
-        </button>
+        <div className="flex gap-2">
+          <button onClick={handleRefresh} className="btn-secondary py-2 px-3" title="Atualizar">
+            <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />
+          </button>
+          <button
+            onClick={takePatient}
+            className="btn-primary py-2 px-4 text-[13px]"
+            disabled={loading || queue.length === 0}
+          >
+            <PlayCircle size={16} />
+            Chamar Proximo
+          </button>
+        </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-        <StatCard icon={<DollarSign size={20} />} bg="var(--mint-light)" color="var(--mint)" label="Renda do Dia (R$ 25/atendimento)" value={`R$ ${stats.earnings.toLocaleString('pt-BR')}`} />
-        <StatCard icon={<TrendingUp size={20} />} bg="var(--accent-ultra-light)" color="var(--accent)" label="Total Atendimentos Hoje" value={`${stats.totalConsultations} Vidas`} />
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        <MetricCard label="Fila de Espera" value={`${queue.length}`} sub="pacientes aguardando" color="brand" />
+        <MetricCard label="Atendimentos Hoje" value={`${stats.totalConsultations}`} sub="consultas finalizadas" color="success" />
+        <MetricCard label="Receita do Dia" value={`R$ ${stats.earnings}`} sub="R$ 25 por consulta" color="warning" />
+        <MetricCard label="Tempo Medio" value="< 5 min" sub="estimativa de espera" color="secondary" />
       </div>
 
-      <div style={{ background: 'var(--bg-white)', borderRadius: 'var(--radius-xl)', border: '1px solid var(--border)', padding: '1.25rem', boxShadow: 'var(--shadow-sm)' }}>
-        <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', marginBottom: '1rem' }}>
-          <Users size={20} color="var(--accent)" />
-          <h3 style={{ margin: 0, fontSize: '1.05rem' }}>Fila de Espera</h3>
-          <span className="status-badge status-active" style={{ marginLeft: 'auto' }}>{queue.length} paciente(s)</span>
+      {/* Queue Table */}
+      <div className="medical-card overflow-hidden">
+        <div className="flex items-center justify-between p-4 border-b border-[var(--color-border)]">
+          <div className="flex items-center gap-2">
+            <Users size={17} className="text-[var(--color-brand)]" />
+            <h3 className="text-[14px] font-semibold m-0">Fila de Espera</h3>
+          </div>
+          <span className="badge badge-info">{queue.length} paciente(s)</span>
         </div>
 
         {queue.length === 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '2.5rem 0', color: 'var(--text-muted)' }}>
-             <FileUser size={48} opacity={0.25} style={{ marginBottom: '0.6rem' }} />
-             <p style={{ fontSize: '0.88rem' }}>A fila está vazia no momento.</p>
+          <div className="flex flex-col items-center py-12 text-[var(--color-text-muted)]">
+            <Clock size={36} className="mb-2 opacity-30" />
+            <p className="text-[13px] font-medium">Nenhum paciente na fila</p>
+            <p className="text-[12px]">A fila sera atualizada automaticamente</p>
           </div>
         ) : (
-          <ul className="queue-list">
-            {queue.map((p, i) => (
-              <li key={p.id} className="queue-item">
-                <div style={{ display: 'flex', gap: '0.7rem', alignItems: 'center' }}>
-                  <div style={{ width: '30px', height: '30px', borderRadius: 'var(--radius-sm)', background: 'var(--accent-ultra-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.78rem', fontWeight: 700, color: 'var(--accent)' }}>{i + 1}</div>
-                  <div>
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.15rem' }}>
-                      <span style={{ fontWeight: 600, color: 'var(--text-heading)', fontSize: '0.9rem' }}>{p.name} — {p.age} anos</span>
-                      <span className="status-badge status-waiting">Na fila</span>
-                    </div>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '0.78rem', margin: 0 }}><strong>Queixa:</strong> {p.complaint}</p>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <table className="medical-table">
+            <thead>
+              <tr>
+                <th style={{ width: 50 }}>#</th>
+                <th>Paciente</th>
+                <th>Idade</th>
+                <th>Queixa</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {queue.map((p, i) => (
+                <tr key={p.id}>
+                  <td className="text-center font-medium text-[var(--color-text-muted)]">{i + 1}</td>
+                  <td className="font-medium">{p.name}</td>
+                  <td className="text-[var(--color-text-secondary)]">{p.age} anos</td>
+                  <td className="text-[var(--color-text-secondary)] max-w-[200px] truncate">{p.complaint}</td>
+                  <td>
+                    <span className={`badge ${p.status === 'in-consultation' ? 'badge-warning' : 'badge-info'}`}>
+                      {p.status === 'in-consultation' ? 'Em atendimento' : 'Aguardando'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
     </div>
   );
 };
 
-const StatCard = ({ icon, bg, color, label, value }: { icon: React.ReactNode; bg: string; color: string; label: string; value: string }) => (
-  <div style={{ background: 'var(--bg-white)', padding: '1.15rem', borderRadius: 'var(--radius-xl)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: '0.85rem', boxShadow: 'var(--shadow-xs)' }}>
-    <div style={{ padding: '0.6rem', background: bg, borderRadius: 'var(--radius-md)', color, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{icon}</div>
-    <div>
-      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{label}</span>
-      <h2 style={{ margin: 0, fontSize: '1.3rem', color: 'var(--text-heading)' }}>{value}</h2>
+const MetricCard = ({ label, value, sub, color }: { label: string; value: string; sub: string; color: string }) => {
+  const colorMap: Record<string, string> = {
+    brand: 'text-[var(--color-brand)]',
+    success: 'text-[var(--color-success)]',
+    warning: 'text-[var(--color-warning)]',
+    secondary: 'text-[var(--color-text-secondary)]',
+  };
+  return (
+    <div className="medical-card p-4">
+      <p className="text-[11px] font-medium text-[var(--color-text-muted)] uppercase tracking-wider mb-1">{label}</p>
+      <p className={`text-[1.375rem] font-bold ${colorMap[color] || ''} mb-0.5`}>{value}</p>
+      <p className="text-[11px] text-[var(--color-text-muted)]">{sub}</p>
     </div>
-  </div>
-);
+  );
+};
 
 export default DoctorDashboard;

@@ -1,8 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import apiClient from '../../api/client';
-import { ShieldCheck, HeartPulse, FileText, ClipboardList, Download, CheckCircle2 } from 'lucide-react';
-import TRTCVideo from '../../components/TRTCVideo';
+import { ShieldCheck, FileText, ClipboardList, Download, CheckCircle2, Loader2 } from 'lucide-react';
+import LiveKitVideo from '../../components/LiveKitVideo';
 import { useStore } from '../../store/useStore';
 import { io, Socket } from 'socket.io-client';
 
@@ -12,177 +12,92 @@ interface ConsultationDocs {
   doctorName?: string;
 }
 
-/**
- * Sala de Consulta do Paciente — VideoSDK WebRTC
- * 
- * Layout: Vídeo do médico em fullscreen, self-view no canto superior esquerdo.
- * Finalização: Recebe evento WebSocket em tempo real do médico → mostra documentos instantaneamente.
- */
 const PatientConsultationRoom = () => {
   const { roomId } = useParams();
   const { user } = useStore();
   const navigate = useNavigate();
 
   const [status, setStatus] = useState<'active' | 'ended'>('active');
-  const [doctorName, setDoctorName] = useState('Médico');
+  const [doctorName, setDoctorName] = useState('Medico');
   const [consultationDocs, setConsultationDocs] = useState<ConsultationDocs | null>(null);
   const [redirectCountdown, setRedirectCountdown] = useState(8);
-
   const socketRef = useRef<Socket | null>(null);
 
-  // ─── Conecta ao WebSocket e entra na sala ───
   useEffect(() => {
     if (!user || !roomId) return;
-
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
     const socket = io(apiUrl, {
       auth: { token: localStorage.getItem('token') },
       transports: ['websocket', 'polling']
     });
     socketRef.current = socket;
-
     socket.on('connect', () => {
-      console.log('[Patient WS] Conectado:', socket.id);
       socket.emit('join-room', { roomId, role: 'patient' });
     });
-
-    // ─── EVENTO PRINCIPAL: Consulta Finalizada pelo Médico ───
     socket.on('consultation-ended', (data: ConsultationDocs) => {
-      console.log('[Patient WS] Consulta encerrada pelo médico:', data);
       setConsultationDocs(data);
       setStatus('ended');
       if (data.doctorName) setDoctorName(data.doctorName);
     });
-
-    socket.on('disconnect', () => {
-      console.log('[Patient WS] Desconectado');
-    });
-
-    return () => {
-      socket.disconnect();
-    };
+    return () => { socket.disconnect(); };
   }, [roomId, user]);
 
-  // ─── Busca nome do médico ao montar ───
   useEffect(() => {
     const fetchDoctorName = async () => {
       try {
         const r = await apiClient.get(`/api/patient/check-queue/${user?.id}`);
-        if (r.data.isActive && r.data.doctorName) {
-          setDoctorName(r.data.doctorName);
-        }
-      } catch (e) { /* ignora */ }
+        if (r.data.isActive && r.data.doctorName) setDoctorName(r.data.doctorName);
+      } catch { /* ignore */ }
     };
     if (user && roomId) fetchDoctorName();
   }, [roomId, user]);
 
-  // ─── Countdown de redirecionamento após finalização ───
   useEffect(() => {
     if (status !== 'ended') return;
     const interval = setInterval(() => {
       setRedirectCountdown(n => {
-        if (n <= 1) {
-          clearInterval(interval);
-          navigate('/patient/dashboard');
-          return 0;
-        }
+        if (n <= 1) { clearInterval(interval); navigate('/patient/dashboard'); return 0; }
         return n - 1;
       });
     }, 1000);
     return () => clearInterval(interval);
   }, [status, navigate]);
 
-  // ─────── TELA DE CONSULTA ENCERRADA ───────
   if (status === 'ended') {
     return (
-      <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #090d16 0%, #0f172a 50%, #042f2e 100%)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontFamily: '"Inter", sans-serif', padding: '1.5rem'
-      }}>
-        <div style={{
-          maxWidth: '560px', width: '100%',
-          animation: 'scaleIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)'
-        }}>
-          {/* Ícone de Sucesso */}
-          <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-            <div style={{
-              width: '100px', height: '100px',
-              background: 'linear-gradient(135deg, #059669, #10b981)',
-              borderRadius: '50%',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              margin: '0 auto 1.5rem',
-              boxShadow: '0 0 50px rgba(16, 185, 129, 0.4)',
-              border: '4px solid rgba(16, 185, 129, 0.2)'
-            }}>
-              <ShieldCheck size={52} color="white" />
+      <div className="min-h-screen bg-[var(--color-bg-primary)] flex items-center justify-center p-4">
+        <div className="max-w-[520px] w-full animate-slide-up">
+          {/* Success Icon */}
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 rounded-full bg-[var(--color-success-light)] border-2 border-[var(--color-success-border)] flex items-center justify-center mx-auto mb-4">
+              <ShieldCheck size={32} className="text-[var(--color-success)]" />
             </div>
-            <h2 style={{
-              fontSize: '2rem', fontWeight: 900,
-              color: 'white', margin: 0,
-              letterSpacing: '-0.03em'
-            }}>
-              Atendimento Concluído!
-            </h2>
-            <p style={{ color: '#94a3b8', marginTop: '0.5rem', fontSize: '1rem' }}>
-              Dr(a). {consultationDocs?.doctorName || doctorName} finalizou sua consulta
-            </p>
+            <h2 className="text-[1.5rem] font-semibold text-[var(--color-text-primary)] mb-1">Atendimento Concluido</h2>
+            <p className="text-[14px] text-[var(--color-text-secondary)]">Dr(a). {consultationDocs?.doctorName || doctorName} finalizou sua consulta</p>
           </div>
 
-          {/* Documentos Disponíveis */}
+          {/* Documents */}
           {(consultationDocs?.consultation || consultationDocs?.atestado) && (
-            <div style={{
-              background: 'rgba(30, 41, 59, 0.7)',
-              backdropFilter: 'blur(16px)',
-              borderRadius: '1.25rem',
-              border: '1px solid rgba(255,255,255,0.1)',
-              overflow: 'hidden',
-              marginBottom: '1.5rem',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.3)'
-            }}>
-              <div style={{
-                padding: '1rem 1.25rem',
-                borderBottom: '1px solid rgba(255,255,255,0.08)',
-                display: 'flex', alignItems: 'center', gap: '0.6rem'
-              }}>
-                <CheckCircle2 size={18} color="#10b981" />
-                <span style={{ color: 'white', fontWeight: 800, fontSize: '0.9rem' }}>
-                  DOCUMENTOS GERADOS AUTOMATICAMENTE
-                </span>
+            <div className="medical-card overflow-hidden mb-4">
+              <div className="p-3 border-b border-[var(--color-border)] flex items-center gap-2">
+                <CheckCircle2 size={15} className="text-[var(--color-success)]" />
+                <span className="text-[13px] font-semibold">Documentos Emitidos</span>
               </div>
 
-              {/* Evolução/Receita */}
-              {consultationDocs.consultation && (
-                <div style={{ padding: '1.25rem', borderBottom: consultationDocs.atestado ? '1px solid rgba(255,255,255,0.06)' : 'none' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
-                    <div style={{
-                      width: '44px', height: '44px', borderRadius: '0.75rem',
-                      background: 'rgba(37, 99, 235, 0.15)',
-                      border: '1px solid rgba(37, 99, 235, 0.3)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      flexShrink: 0
-                    }}>
-                      <ClipboardList size={22} color="#60a5fa" />
+              {consultationDocs?.consultation && (
+                <div className="p-4 border-b border-[var(--color-border)]">
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-[var(--color-brand-light)] flex items-center justify-center flex-shrink-0">
+                      <ClipboardList size={16} className="text-[var(--color-brand)]" />
                     </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ color: 'white', fontWeight: 800, fontSize: '0.9rem', marginBottom: '0.25rem' }}>
-                        Evolução Clínica e Receituário
-                      </div>
-                      <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.5rem' }}>
-                        Código: <span style={{ color: '#38bdf8', fontFamily: 'monospace' }}>
-                          {consultationDocs.consultation.code}
-                        </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] font-semibold mb-0.5">Evolucao Clinica e Receituario</div>
+                      <div className="text-[11px] text-[var(--color-text-muted)] mb-2">
+                        Codigo: <span className="font-mono text-[var(--color-brand)]">{consultationDocs.consultation.code}</span>
                       </div>
                       {consultationDocs.consultation.prescriptions && (
-                        <div style={{
-                          background: 'rgba(255,255,255,0.04)', borderRadius: '0.5rem',
-                          padding: '0.6rem 0.75rem', fontSize: '0.8rem', color: '#cbd5e1',
-                          lineHeight: 1.5, fontFamily: 'monospace',
-                          maxHeight: '80px', overflowY: 'auto'
-                        }}>
-                          {consultationDocs.consultation.prescriptions.substring(0, 200)}
-                          {consultationDocs.consultation.prescriptions.length > 200 ? '...' : ''}
+                        <div className="bg-[var(--color-bg-subtle)] rounded-md p-2.5 text-[12px] text-[var(--color-text-secondary)] font-mono max-h-[60px] overflow-hidden">
+                          {consultationDocs.consultation.prescriptions.substring(0, 150)}
                         </div>
                       )}
                     </div>
@@ -190,43 +105,18 @@ const PatientConsultationRoom = () => {
                 </div>
               )}
 
-              {/* Atestado */}
-              {consultationDocs.atestado && (
-                <div style={{ padding: '1.25rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem' }}>
-                    <div style={{
-                      width: '44px', height: '44px', borderRadius: '0.75rem',
-                      background: 'rgba(16, 185, 129, 0.15)',
-                      border: '1px solid rgba(16, 185, 129, 0.3)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      flexShrink: 0
-                    }}>
-                      <FileText size={22} color="#34d399" />
+              {consultationDocs?.atestado && (
+                <div className="p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-[var(--color-success-light)] flex items-center justify-center flex-shrink-0">
+                      <FileText size={16} className="text-[var(--color-success)]" />
                     </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ color: 'white', fontWeight: 800, fontSize: '0.9rem', marginBottom: '0.25rem' }}>
-                        Atestado Médico — {consultationDocs.atestado.daysOff} dia(s) de afastamento
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] font-semibold mb-0.5">Atestado Medico — {consultationDocs.atestado.daysOff} dia(s)</div>
+                      <div className="text-[11px] text-[var(--color-text-muted)]">
+                        Codigo: <span className="font-mono text-[var(--color-success)]">{consultationDocs.atestado.code}</span>
+                        {consultationDocs.atestado.cid && <span className="ml-2">CID: {consultationDocs.atestado.cid}</span>}
                       </div>
-                      <div style={{ color: '#64748b', fontSize: '0.75rem', marginBottom: '0.5rem' }}>
-                        Código: <span style={{ color: '#34d399', fontFamily: 'monospace' }}>
-                          {consultationDocs.atestado.code}
-                        </span>
-                        {consultationDocs.atestado.cid && (
-                          <span style={{ marginLeft: '0.5rem', color: '#94a3b8' }}>
-                            · CID: {consultationDocs.atestado.cid}
-                          </span>
-                        )}
-                      </div>
-                      {consultationDocs.atestado.content && (
-                        <div style={{
-                          background: 'rgba(16, 185, 129, 0.06)', borderRadius: '0.5rem',
-                          padding: '0.6rem 0.75rem', fontSize: '0.8rem', color: '#a7f3d0',
-                          lineHeight: 1.5, border: '1px solid rgba(16, 185, 129, 0.15)'
-                        }}>
-                          {consultationDocs.atestado.content.substring(0, 150)}
-                          {consultationDocs.atestado.content.length > 150 ? '...' : ''}
-                        </div>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -234,66 +124,27 @@ const PatientConsultationRoom = () => {
             </div>
           )}
 
-          {/* Botão Ver Histórico Completo */}
-          <button
-            onClick={() => navigate('/patient/profile')}
-            style={{
-              width: '100%', marginBottom: '0.75rem',
-              background: 'linear-gradient(135deg, #2563eb, #3b82f6)',
-              color: 'white', border: 'none',
-              padding: '0.95rem', borderRadius: '0.85rem',
-              fontWeight: 800, fontSize: '0.95rem',
-              cursor: 'pointer', display: 'flex',
-              alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-              boxShadow: '0 8px 20px rgba(37,99,235,0.3)',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            <Download size={18} /> Ver Todos os Meus Documentos
+          <button onClick={() => navigate('/patient/profile')} className="btn-primary w-full py-2.5 mb-3">
+            <Download size={16} /> Ver Todos os Documentos
           </button>
 
-          {/* Redirecionamento automático */}
-          <div style={{
-            textAlign: 'center', marginTop: '1rem',
-            color: '#475569', fontSize: '0.85rem',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem'
-          }}>
-            <div style={{
-              width: '14px', height: '14px', borderRadius: '50%',
-              border: '2px solid #334155', borderTopColor: '#10b981',
-              animation: 'spin 1s linear infinite'
-            }} />
-            Redirecionando para o painel em <strong style={{ color: '#38bdf8' }}>{redirectCountdown}s</strong>...
+          <div className="text-center text-[12px] text-[var(--color-text-muted)] flex items-center justify-center gap-2">
+            <Loader2 size={12} className="animate-spin" />
+            Redirecionando em {redirectCountdown}s...
           </div>
         </div>
-
-        <style>{`
-          @keyframes scaleIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
-          @keyframes spin { to { transform: rotate(360deg); } }
-        `}</style>
       </div>
     );
   }
 
-  // ─────── TELA PRINCIPAL DE CONSULTA ───────
   return (
-    <div style={{
-      height: '100vh', background: '#000',
-      position: 'relative', overflow: 'hidden',
-      fontFamily: '"Inter", sans-serif'
-    }}>
-      {/* Componente de Vídeo VideoSDK WebRTC */}
-      <div style={{ width: '100%', height: '100%' }}>
+    <div className="consultation-fullscreen bg-[#111827]">
+      <div className="w-full h-full">
         {roomId ? (
-          <TRTCVideo
-            roomId={roomId}
-            role="patient"
-            userName={user?.name || 'Paciente'}
-            onLeave={() => navigate('/patient/dashboard')}
-          />
+          <LiveKitVideo roomId={roomId} role="patient" userName={user?.name || 'Paciente'} onLeave={() => navigate('/patient/dashboard')} />
         ) : (
-          <div style={{ color: 'white', display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
-            Carregando sala de vídeo...
+          <div className="flex items-center justify-center h-full text-[#9CA3AF]">
+            <Loader2 size={28} className="animate-spin" />
           </div>
         )}
       </div>

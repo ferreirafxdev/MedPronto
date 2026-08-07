@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { FileSearch, Search, XCircle, CheckCircle, User, UserCheck, Calendar, ClipboardList, ShieldCheck } from 'lucide-react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Search, XCircle, CheckCircle, User, UserCheck, Calendar, ClipboardList, ShieldCheck, ArrowLeft } from 'lucide-react';
 import apiClient from '../api/client';
 
 const VerifyDocument = () => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [code, setCode] = useState(searchParams.get('code') || '');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -13,22 +14,21 @@ const VerifyDocument = () => {
   const handleVerify = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!code) return;
-    
-    setLoading(true); 
-    setError(''); 
+
+    setLoading(true);
+    setError('');
     setResult(null);
-    
+
     try {
       const resp = await apiClient.get(`/api/validate-document/${code.trim().toUpperCase()}`);
       setResult(resp.data);
-    } catch (err: any) { 
-      setError(err.response?.data?.error || 'Código inválido ou documento não encontrado.'); 
-    } finally { 
-      setLoading(false); 
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Codigo invalido ou documento nao encontrado.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Auto-verify if code is present in URL
   useEffect(() => {
     if (searchParams.get('code')) {
       handleVerify();
@@ -36,95 +36,102 @@ const VerifyDocument = () => {
   }, []);
 
   return (
-    <div className="auth-container">
-      <div className="premium-card animate-fade-in" style={{ maxWidth: '600px', width: '100%' }}>
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div className="logo-icon" style={{ margin: '0 auto 1rem auto', width: '48px', height: '48px' }}>
-            <ShieldCheck size={28} color="white" />
-          </div>
-          <h2 style={{ fontSize: '1.75rem', marginBottom: '0.5rem' }}>Validador de Documentos</h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
-            Garanta a autenticidade de receitas, prontuários e atestados emitidos pela plataforma MedPronto.
-          </p>
+    <div className="min-h-screen bg-[var(--color-bg-primary)] flex flex-col items-center p-4 pt-8">
+      <div className="w-full max-w-[540px]">
+        {/* Navigation */}
+        <div className="mb-4">
+          <button onClick={() => navigate(-1)} className="btn-secondary py-1.5 px-3 text-[12px] gap-1">
+            <ArrowLeft size={14} /> Voltar
+          </button>
         </div>
 
-        <form onSubmit={handleVerify}>
-          <div className="form-group">
-            <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--navy-light)', marginBottom: '0.5rem', display: 'block' }}>
-              Código de Validação (Ex: MP-XXXXXXXX ou MP-R-XXXXXXXX)
-            </label>
-            <div style={{ position: 'relative' }}>
-              <input 
-                type="text" 
-                className="form-control" 
-                value={code} 
-                onChange={(e) => setCode(e.target.value)} 
-                placeholder="Insira o código impresso no documento..." 
-                style={{ paddingRight: '3rem', height: '50px' }} 
-              />
-              <Search size={20} style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)' }} />
+        {/* Main Card */}
+        <div className="medical-card p-8">
+          <div className="text-center mb-6">
+            <div className="w-12 h-12 rounded-xl bg-[var(--color-brand-light)] flex items-center justify-center mx-auto mb-3">
+              <ShieldCheck size={22} className="text-[var(--color-brand)]" />
             </div>
-          </div>
-          <button className="btn btn-primary btn-full btn-lg" disabled={loading} type="submit">
-            {loading ? "Verificando Autenticidade..." : "Validar Documento"}
-          </button>
-        </form>
-
-        {error && (
-          <div className="animate-fade-in" style={{ marginTop: '1.5rem', padding: '1.25rem', background: 'rgba(244,63,94,0.05)', border: '1px solid rgba(244,63,94,0.2)', borderRadius: 'var(--radius-lg)', textAlign: 'center' }}>
-            <XCircle size={32} color="var(--coral)" style={{ marginBottom: '0.5rem', margin: '0 auto 0.5rem auto' }} />
-            <p style={{ color: 'var(--coral)', fontWeight: 600, margin: 0 }}>{error}</p>
-            <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.25rem' }}>
-              Verifique se digitou o código corretamente ou se o documento é legítimo.
+            <h2 className="text-[1.25rem] font-semibold mb-1">Validador de Documentos</h2>
+            <p className="text-[13px] text-[var(--color-text-secondary)]">
+              Verifique a autenticidade de receitas, prontuarios e atestados digitais
             </p>
           </div>
-        )}
 
-        {result && (
-          <div className="animate-fade-in" style={{ marginTop: '2rem' }}>
-            <div style={{ padding: '1.25rem', background: 'var(--accent-ultra-light)', border: '1px solid var(--border-accent)', borderRadius: 'var(--radius-lg)', textAlign: 'center', marginBottom: '1.5rem' }}>
-              <CheckCircle size={40} color="var(--accent)" style={{ marginBottom: '0.5rem', margin: '0 auto 0.5rem auto' }} />
-              <h3 style={{ color: 'var(--accent)', margin: 0, fontSize: '1.25rem' }}>Documento Autêntico</h3>
-              <div className="badge" style={{ marginTop: '0.5rem' }}>{result.type}</div>
+          <form onSubmit={handleVerify} className="space-y-4">
+            <div>
+              <label className="block text-[12px] font-medium text-[var(--color-text-secondary)] mb-1.5 uppercase tracking-wider">
+                Codigo de Validacao (Ex: MP-XXXXXXXX ou MP-R-XXXXXXXX)
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  className="medical-input pr-10"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  placeholder="Insira o codigo impresso no documento"
+                />
+                <Search size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]" />
+              </div>
             </div>
 
-            <div className="premium-card" style={{ padding: '1.5rem', background: 'var(--bg-subtle)' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-                <Info icon={<User size={18} />} label="Paciente" value={result.document.patientName} />
-                <Info icon={<UserCheck size={18} />} label="Médico Responsável" value={result.document.doctorName} />
-                <Info icon={<Calendar size={18} />} label="Data de Emissão" value={new Date(result.document.date).toLocaleDateString('pt-BR')} />
-                <Info icon={<Calendar size={18} />} label="CRM do Médico" value={result.document.doctorCrm} />
+            <button className="btn-primary w-full py-2.5" disabled={loading} type="submit">
+              {loading ? 'Verificando Autenticidade...' : 'Validar Documento'}
+            </button>
+          </form>
+
+          {/* Error Message */}
+          {error && (
+            <div className="mt-6 p-4 bg-[var(--color-error-light)] border border-[var(--color-error-border)] rounded-md text-center space-y-1">
+              <XCircle size={24} className="text-[var(--color-error)] mx-auto" />
+              <p className="text-[13px] font-semibold text-[var(--color-error)] m-0">{error}</p>
+              <p className="text-[12px] text-[var(--color-text-muted)] m-0">
+                Verifique se o codigo foi digitado corretamente.
+              </p>
+            </div>
+          )}
+
+          {/* Result Card */}
+          {result && (
+            <div className="mt-6 space-y-4">
+              <div className="p-4 bg-[var(--color-success-light)] border border-[var(--color-success-border)] rounded-md text-center space-y-1">
+                <CheckCircle size={28} className="text-[var(--color-success)] mx-auto" />
+                <h3 className="text-[14px] font-semibold text-[var(--color-success)] m-0">Documento Autentico</h3>
+                <span className="badge badge-success mt-1">{result.type}</span>
               </div>
-              
-              <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', gap: '0.75rem' }}>
-                    <ClipboardList size={20} color="var(--accent)" />
-                    <div>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'block', marginBottom: '0.25rem' }}>
-                            Resumo do Documento
-                        </span>
-                        <p style={{ color: 'var(--text-heading)', fontSize: '0.9rem', whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
-                            {result.document.details}
-                        </p>
-                    </div>
+
+              <div className="bg-[var(--color-bg-subtle)] border border-[var(--color-border)] p-4 rounded-md space-y-3 text-[13px]">
+                <div className="grid grid-cols-2 gap-3">
+                  <Info icon={<User size={15} />} label="Paciente" value={result.document.patientName} />
+                  <Info icon={<UserCheck size={15} />} label="Medico Responsavel" value={result.document.doctorName} />
+                  <Info icon={<Calendar size={15} />} label="Data de Emissao" value={new Date(result.document.date).toLocaleDateString('pt-BR')} />
+                  <Info icon={<ShieldCheck size={15} />} label="CRM do Medico" value={result.document.doctorCrm} />
+                </div>
+
+                <div className="pt-3 border-t border-[var(--color-border)] space-y-1">
+                  <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase text-[var(--color-text-muted)]">
+                    <ClipboardList size={14} className="text-[var(--color-brand)]" /> Resumo do Documento
+                  </div>
+                  <p className="text-[13px] text-[var(--color-text-primary)] font-mono whitespace-pre-wrap leading-relaxed m-0 bg-white p-2.5 rounded border border-[var(--color-border)]">
+                    {result.document.details}
+                  </p>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
 };
 
 const Info = ({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) => (
-  <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
-    <div style={{ color: 'var(--accent)', marginTop: '0.2rem' }}>{icon}</div>
+  <div className="flex items-start gap-2">
+    <div className="text-[var(--color-brand)] mt-0.5">{icon}</div>
     <div>
-      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '0.1rem' }}>
+      <span className="block text-[10px] font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">
         {label}
       </span>
-      <span style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--navy-dark)' }}>{value}</span>
+      <span className="text-[13px] font-semibold text-[var(--color-text-primary)]">{value}</span>
     </div>
   </div>
 );

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
 import { Stethoscope, User as UserIcon, Lock, Loader2, ArrowRight } from 'lucide-react';
@@ -13,62 +13,88 @@ const DoctorLogin = () => {
     e.preventDefault();
     setLoading(true);
     try {
-        const formData = new FormData(e.target as HTMLFormElement);
-        const login = formData.get('login');
-        const password = formData.get('password');
-        const loginStr = String(login || '').trim();
-        
-        if (loginStr === 'admin@medpronto.com') {
-            // Login Direto do Administrador
-            const respAdmin = await apiClient.post('/api/admin/auth', { login, password });
-            if (respAdmin.data.success) {
-                setUser({ id: respAdmin.data.admin.id, name: respAdmin.data.admin.name, role: 'admin', token: respAdmin.data.token });
-                navigate('/admin/dashboard');
-                return;
-            }
-        } else {
-            // Login Direto do Médico
-            const resp = await apiClient.post('/api/doctor/auth', { login, password });
-            if (resp.data.success) {
-                setUser({ id: resp.data.doctor.id, name: resp.data.doctor.name, role: 'doctor', token: resp.data.token });
-                navigate('/doctor/dashboard');
-                return;
-            }
+      const formData = new FormData(e.target as HTMLFormElement);
+      const login = formData.get('login');
+      const password = formData.get('password');
+      const loginStr = String(login || '').trim();
+
+      if (loginStr === 'admin@medpronto.com') {
+        const respAdmin = await apiClient.post('/api/admin/auth', { login, password });
+        if (respAdmin.data.success) {
+          setUser({ id: respAdmin.data.admin.id, name: respAdmin.data.admin.name, role: 'admin', token: respAdmin.data.token });
+          navigate('/admin/dashboard');
+          return;
         }
+      } else {
+        const resp = await apiClient.post('/api/doctor/auth', { login, password });
+        if (resp.data.success) {
+          setUser({ id: resp.data.doctor.id, name: resp.data.doctor.name, role: 'doctor', token: resp.data.token });
+          navigate('/doctor/dashboard');
+          return;
+        }
+      }
     } catch (error: any) {
-        alert(error.response?.data?.error || "Erro ao fazer login no sistema. Credenciais inválidas.");
-    } finally { setLoading(false); }
+      alert(error.response?.data?.error || 'Credenciais invalidas ou erro de conexao.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="auth-container" style={{ background: 'var(--bg-base)' }}>
-      <div className="premium-card animate-fade-in" style={{ maxWidth: '440px', padding: '3.5rem 2.5rem' }}>
-        <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
-          <div className="icon-wrapper" style={{ background: 'var(--mint-light)', margin: '0 auto 0.85rem auto' }}>
-            <Stethoscope size={26} color="var(--mint)" />
+    <div className="w-full max-w-[400px]">
+      <div className="medical-card p-8">
+        {/* Header */}
+        <div className="text-center mb-6">
+          <div className="w-12 h-12 rounded-xl bg-[var(--color-success-light)] flex items-center justify-center mx-auto mb-3">
+            <Stethoscope size={22} className="text-[var(--color-success)]" />
           </div>
-          <h2 style={{ fontSize: '1.45rem', marginBottom: '0.3rem' }}>Área Médica e Admin</h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>Acesso restrito para colaboradores</p>
+          <h2 className="text-[1.25rem] font-semibold mb-1">Area Medica</h2>
+          <p className="text-[13px] text-[var(--color-text-secondary)]">Acesso restrito para profissionais credenciados</p>
         </div>
-        <form onSubmit={handleAction}>
-          <div className="form-group">
-            <label>CRM ou E-mail</label>
-            <div style={{ position: 'relative' }}>
-              <UserIcon size={15} style={{ position: 'absolute', left: '0.8rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)' }} />
-              <input required name="login" className="form-control" placeholder="CRM ou credencial Admin" style={{ paddingLeft: '2.3rem' }} />
+
+        {/* Form */}
+        <form onSubmit={handleAction} className="space-y-4">
+          <div>
+            <label className="block text-[12px] font-medium text-[var(--color-text-secondary)] mb-1.5 uppercase tracking-wider">
+              CRM ou E-mail
+            </label>
+            <div className="relative">
+              <UserIcon size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]" />
+              <input
+                required
+                name="login"
+                className="medical-input pl-9"
+                placeholder="Insira seu CRM ou e-mail"
+              />
             </div>
           </div>
-          <div className="form-group">
-            <label>Senha</label>
-            <div style={{ position: 'relative' }}>
-              <Lock size={15} style={{ position: 'absolute', left: '0.8rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-faint)' }} />
-              <input required name="password" type="password" className="form-control" placeholder="••••••••" style={{ paddingLeft: '2.3rem' }} />
+
+          <div>
+            <label className="block text-[12px] font-medium text-[var(--color-text-secondary)] mb-1.5 uppercase tracking-wider">
+              Senha
+            </label>
+            <div className="relative">
+              <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]" />
+              <input
+                required
+                name="password"
+                type="password"
+                className="medical-input pl-9"
+                placeholder="Insira sua senha"
+              />
             </div>
           </div>
-          <button type="submit" className="btn btn-primary btn-full btn-lg" style={{ marginTop: '0.75rem' }} disabled={loading}>
-            {loading ? <Loader2 size={18} className="animate-spin" /> : (
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                Acessar Sistema <ArrowRight size={18} />
+
+          <button
+            type="submit"
+            className="btn-primary w-full py-2.5 mt-2"
+            disabled={loading}
+          >
+            {loading ? (
+              <Loader2 size={18} className="animate-spin" />
+            ) : (
+              <span className="flex items-center gap-2">
+                Acessar Sistema <ArrowRight size={16} />
               </span>
             )}
           </button>

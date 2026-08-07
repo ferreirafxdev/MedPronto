@@ -1,60 +1,55 @@
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
-import AdminDashboard from './pages/Admin/AdminDashboard';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import AppLayout from './layouts/AppLayout';
+import AuthLayout from './layouts/AuthLayout';
+
+// Auth Pages
 import AdminLogin from './pages/Admin/AdminLogin';
-import PatientLogin from './pages/Patient/PatientLogin';
-import PatientDashboard from './pages/Patient/PatientDashboard';
 import DoctorLogin from './pages/Doctor/DoctorLogin';
+import PatientLogin from './pages/Patient/PatientLogin';
+import PatientPayment from './pages/Patient/PatientPayment';
+
+// App Pages
+import AdminDashboard from './pages/Admin/AdminDashboard';
 import DoctorDashboard from './pages/Doctor/DoctorDashboard';
 import ConsultationRoom from './pages/Doctor/ConsultationRoom';
+import PatientDashboard from './pages/Patient/PatientDashboard';
 import PatientConsultationRoom from './pages/Patient/PatientConsultationRoom';
 import PatientProfile from './pages/Patient/PatientProfile';
-import PatientPayment from './pages/Patient/PatientPayment';
+
+// Public Pages
 import HomePage from './pages/HomePage';
 import VerifyDocument from './pages/VerifyDocument';
-import Header from './components/Header';
+
 import './index.css';
-
-function AppContent() {
-  const location = useLocation();
-  const isRoom = location.pathname.includes('/consultation/');
-  const isPayment = location.pathname === '/patient/payment';
-  const shouldHideHeader = isRoom || isPayment;
-
-  return (
-    <div className={`app-container ${shouldHideHeader ? 'no-header' : ''}`}>
-      {!shouldHideHeader && <Header />}
-      <main className={`main-content ${shouldHideHeader ? 'no-padding' : ''}`}>
-
-
-        <Routes>
-            <Route path="/" element={<HomePage />} />
-            
-            {/* Admin Routes */}
-            <Route path="/admin/login" element={<AdminLogin />} />
-            <Route path="/admin/dashboard" element={<AdminDashboard />} />
-
-            {/* Patient Routes */}
-            <Route path="/patient/payment" element={<PatientPayment />} />
-            <Route path="/patient/login" element={<PatientLogin />} />
-            <Route path="/patient/dashboard" element={<PatientDashboard />} />
-            <Route path="/patient/consultation/:roomId" element={<PatientConsultationRoom />} />
-            <Route path="/patient/profile" element={<PatientProfile />} />
-
-            {/* Doctor Routes */}
-            <Route path="/doctor/login" element={<DoctorLogin />} />
-            <Route path="/doctor/dashboard" element={<DoctorDashboard />} />
-            <Route path="/doctor/consultation/:roomId" element={<ConsultationRoom />} />
-          <Route path="/validar" element={<VerifyDocument />} />
-        </Routes>
-      </main>
-    </div>
-  );
-}
 
 function App() {
   return (
     <BrowserRouter>
-      <AppContent />
+      <Routes>
+        {/* Public / Landing */}
+        <Route path="/" element={<HomePage />} />
+        <Route path="/validar" element={<VerifyDocument />} />
+
+        {/* Auth Pages (minimal header layout) */}
+        <Route element={<AuthLayout />}>
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/doctor/login" element={<DoctorLogin />} />
+          <Route path="/patient/login" element={<PatientLogin />} />
+          <Route path="/patient/payment" element={<PatientPayment />} />
+        </Route>
+
+        {/* App Pages (sidebar layout) */}
+        <Route element={<AppLayout />}>
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/doctor/dashboard" element={<DoctorDashboard />} />
+          <Route path="/patient/dashboard" element={<PatientDashboard />} />
+          <Route path="/patient/profile" element={<PatientProfile />} />
+        </Route>
+
+        {/* Consultation Rooms (fullscreen, no layout wrapper) */}
+        <Route path="/doctor/consultation/:roomId" element={<ConsultationRoom />} />
+        <Route path="/patient/consultation/:roomId" element={<PatientConsultationRoom />} />
+      </Routes>
     </BrowserRouter>
   );
 }

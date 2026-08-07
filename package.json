@@ -1,7 +1,7 @@
 {
   "scripts": {
     "start": "cd backend && node dist/index.js",
-    "build": "cd backend && npm install && npm run build"
+    "build": "cd backend && npm run build && cd ../frontend && npm run build"
   },
   "dependencies": {
     "livekit-server-sdk": "^2.15.3",

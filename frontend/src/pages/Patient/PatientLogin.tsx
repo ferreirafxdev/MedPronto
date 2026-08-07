@@ -1,29 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useStore } from '../../store/useStore';
-import { Loader2, HeartPulse, User, Mail, Calendar, Hash, ArrowRight, MessageSquare, Fingerprint, CreditCard, CheckCircle } from 'lucide-react';
+import { Loader2, HeartPulse, User, Mail, Calendar, Hash, ArrowRight, MessageSquare, Fingerprint } from 'lucide-react';
 import apiClient from '../../api/client';
 
 const PatientLogin = () => {
   const [searchParams] = useSearchParams();
   const initialMode = searchParams.get('mode') === 'register';
-  
   const [isLogin, setIsLogin] = useState(!initialMode);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { setUser } = useStore();
-  
-  const [formData, setFormData] = useState({ 
-    name: '', 
-    cpf: '', 
-    age: '', 
-    email: '', 
-    birthDate: '',
-    complaint: '' 
+
+  const [formData, setFormData] = useState({
+    name: '', cpf: '', age: '', email: '', birthDate: '', complaint: ''
   });
 
   useEffect(() => {
-    // If trying to register, check if payment was confirmed
     if (!isLogin && !localStorage.getItem('payment_confirmed')) {
       navigate('/patient/payment');
     }
@@ -44,21 +37,18 @@ const PatientLogin = () => {
     const birthDateObj = new Date(birthDate);
     let age = today.getFullYear() - birthDateObj.getFullYear();
     const monthDiff = today.getMonth() - birthDateObj.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDateObj.getDate())) {
-      age--;
-    }
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDateObj.getDate())) age--;
     return age < 0 ? '0' : age.toString();
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => { 
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     if (name === 'cpf') {
       setFormData({ ...formData, cpf: formatCPF(value) });
     } else if (name === 'birthDate') {
-      const newAge = calculateAge(value);
-      setFormData({ ...formData, [name]: value, age: newAge });
+      setFormData({ ...formData, [name]: value, age: calculateAge(value) });
     } else {
-      setFormData({ ...formData, [name]: value }); 
+      setFormData({ ...formData, [name]: value });
     }
   };
 
@@ -67,170 +57,135 @@ const PatientLogin = () => {
     setLoading(true);
     try {
       if (isLogin) {
-        const loginResp = await apiClient.post('/api/patient/auth', { 
-          cpf: formData.cpf, 
-          birthDate: formData.birthDate 
+        const loginResp = await apiClient.post('/api/patient/auth', {
+          cpf: formData.cpf,
+          birthDate: formData.birthDate
         });
         if (loginResp.data.success) {
-            const { patient: pat, token } = loginResp.data;
-            setUser({ 
-                id: pat.id, 
-                name: pat.name, 
-                role: 'patient', 
-                cpf: pat.cpf, 
-                age: pat.age, 
-                email: pat.email,
-                token
-            });
-            navigate('/patient/dashboard');
+          const { patient: pat, token } = loginResp.data;
+          setUser({ id: pat.id, name: pat.name, role: 'patient', cpf: pat.cpf, age: pat.age, email: pat.email, token });
+          navigate('/patient/dashboard');
         }
       } else {
         const regResp = await apiClient.post('/api/patient/register', formData);
         if (regResp.data.success) {
-            const { patient: pat, token } = regResp.data;
-            setUser({ 
-                id: pat.id, 
-                name: pat.name, 
-                role: 'patient', 
-                cpf: pat.cpf, 
-                age: pat.age, 
-                email: pat.email,
-                token
-            });
-            // Store the complaint temporarily for auto-enqueue in the dashboard
-            if (formData.complaint) {
-              localStorage.setItem('temp_complaint', formData.complaint);
-            }
-            // Clear payment flag and set just_registered for auto-enqueue
-            localStorage.removeItem('payment_confirmed');
-            navigate('/patient/dashboard?just_registered=true');
+          const { patient: pat, token } = regResp.data;
+          setUser({ id: pat.id, name: pat.name, role: 'patient', cpf: pat.cpf, age: pat.age, email: pat.email, token });
+          if (formData.complaint) localStorage.setItem('temp_complaint', formData.complaint);
+          localStorage.removeItem('payment_confirmed');
+          navigate('/patient/dashboard?just_registered=true');
         }
       }
     } catch (error: any) {
       if (error.response?.status === 409) {
-        alert("Parece que você já é nosso paciente! Verificamos que este CPF já possui um cadastro. \n\nVamos te levar para a tela de login para você continuar seu atendimento.");
+        alert('Este CPF ja possui cadastro. Voce sera redirecionado para o login.');
         setIsLogin(true);
-        // Pre-fill the CPF if we have it
         setFormData(prev => ({ ...prev, name: '', email: '', complaint: '' }));
       } else {
-        alert(error.response?.data?.error || "Credenciais inválidas ou erro de conexão.");
+        alert(error.response?.data?.error || 'Credenciais invalidas ou erro de conexao.');
       }
-    } finally { setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="auth-container" style={{ background: 'var(--bg-base)', position: 'relative' }}>
-      <div className="premium-card animate-fade-in" style={{ maxWidth: '540px', padding: '3.5rem 3rem' }}>
-        
-        {/* HEADER */}
-        <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-          <div className="icon-wrapper" style={{ 
-            background: isLogin ? 'var(--accent-ultra-light)' : 'var(--coral-light)', 
-            margin: '0 auto 1rem auto',
-            width: '64px', height: '64px',
-            transition: 'all 0.4s var(--ease-spring)'
-          }}>
-            {isLogin ? <Fingerprint size={32} color="var(--accent)" /> : <HeartPulse size={32} color="var(--coral)" />}
+    <div className="w-full max-w-[480px]">
+      <div className="medical-card p-8">
+        {/* Header */}
+        <div className="text-center mb-6">
+          <div className={`w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3 ${isLogin ? 'bg-[var(--color-brand-light)]' : 'bg-[var(--color-error-light)]'}`}>
+            {isLogin ? <Fingerprint size={22} className="text-[var(--color-brand)]" /> : <HeartPulse size={22} className="text-[var(--color-error)]" />}
           </div>
-          <h2 style={{ fontSize: '1.75rem', marginBottom: '0.4rem', letterSpacing: '-0.03em' }}>
-            {isLogin ? 'Acessar Prontuário' : 'Nova Consulta'}
+          <h2 className="text-[1.25rem] font-semibold mb-1">
+            {isLogin ? 'Acessar Prontuario' : 'Nova Consulta'}
           </h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem' }}>
-            {isLogin ? 'Bem-vindo de volta! Identifique-se para continuar.' : 'Cadastre-se para iniciar seu atendimento com um médico agora.'}
+          <p className="text-[13px] text-[var(--color-text-secondary)]">
+            {isLogin ? 'Identifique-se para acessar seu historico.' : 'Cadastre-se para iniciar o atendimento.'}
           </p>
         </div>
 
-        {/* CONTENT */}
-        <form onSubmit={handleAction} style={{ display: 'grid', gap: '1.25rem' }}>
+        {/* Form */}
+        <form onSubmit={handleAction} className="space-y-4">
           {!isLogin ? (
             <>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--navy-light)' }}>
-                  <User size={14} color="var(--accent)" /> Nome Completo
-                </label>
-                <input required name="name" value={formData.name} onChange={handleChange} className="form-control" placeholder="Eentre seu nome completo" />
+              <FormField label="Nome Completo" icon={<User size={14} />}>
+                <input required name="name" value={formData.name} onChange={handleChange} className="medical-input" placeholder="Seu nome completo" />
+              </FormField>
+
+              <div className="grid grid-cols-[1.2fr_1fr] gap-3">
+                <FormField label="CPF" icon={<Hash size={14} />}>
+                  <input required name="cpf" value={formData.cpf} onChange={handleChange} className="medical-input" placeholder="000.000.000-00" />
+                </FormField>
+                <FormField label="Nascimento" icon={<Calendar size={14} />}>
+                  <input required name="birthDate" type="date" value={formData.birthDate} onChange={handleChange} className="medical-input" />
+                </FormField>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '1rem' }}>
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--navy-light)' }}>
-                    <Hash size={14} color="var(--accent)" /> CPF
-                  </label>
-                  <input required name="cpf" value={formData.cpf} onChange={handleChange} className="form-control" placeholder="000.000.000-00" />
-                </div>
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <Calendar size={14} /> Nascimento
-                  </label>
-                  <input required name="birthDate" type="date" value={formData.birthDate} onChange={handleChange} className="form-control" />
-                </div>
+              <div className="grid grid-cols-[80px_1fr] gap-3">
+                <FormField label="Idade">
+                  <input readOnly name="age" value={formData.age} className="medical-input bg-[var(--color-bg-subtle)] text-center font-medium" placeholder="-" />
+                </FormField>
+                <FormField label="E-mail" icon={<Mail size={14} />}>
+                  <input required name="email" type="email" value={formData.email} onChange={handleChange} className="medical-input" placeholder="seu@email.com" />
+                </FormField>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1rem' }}>
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label style={{ color: 'var(--accent)', fontWeight: 700 }}>Idade</label>
-                  <input readOnly name="age" value={formData.age} className="form-control" style={{ background: 'var(--bg-subtle)', fontWeight: 700, textAlign: 'center' }} placeholder="—" />
-                </div>
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <Mail size={14} /> E-mail
-                  </label>
-                  <input required name="email" type="email" value={formData.email} onChange={handleChange} className="form-control" placeholder="seu@email.com" />
-                </div>
-              </div>
-              
-              <div className="form-group" style={{ marginBottom: '0.5rem' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <MessageSquare size={14} /> O que você está sentindo?
-                </label>
-                <textarea required name="complaint" value={formData.complaint} onChange={handleChange} className="form-control" placeholder="Descreva brevemente sua queixa atual..." rows={3} />
-              </div>
+              <FormField label="Queixa Principal" icon={<MessageSquare size={14} />}>
+                <textarea required name="complaint" value={formData.complaint} onChange={handleChange} className="medical-textarea" placeholder="Descreva brevemente o que voce esta sentindo..." rows={3} />
+              </FormField>
             </>
           ) : (
-            <div style={{ display: 'grid', gap: '1.25rem', animation: 'fadeIn 0.4s ease' }}>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <Hash size={14} /> Seu CPF
-                </label>
-                <input required name="cpf" value={formData.cpf} onChange={handleChange} className="form-control" placeholder="000.000.000-00" />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <Calendar size={14} /> Data de Nascimento
-                </label>
-                <input required name="birthDate" type="date" value={formData.birthDate} onChange={handleChange} className="form-control" />
-              </div>
-            </div>
+            <>
+              <FormField label="CPF" icon={<Hash size={14} />}>
+                <input required name="cpf" value={formData.cpf} onChange={handleChange} className="medical-input" placeholder="000.000.000-00" />
+              </FormField>
+              <FormField label="Data de Nascimento" icon={<Calendar size={14} />}>
+                <input required name="birthDate" type="date" value={formData.birthDate} onChange={handleChange} className="medical-input" />
+              </FormField>
+            </>
           )}
 
-          <button type="submit" className="btn btn-primary btn-full btn-lg" style={{ marginTop: '1rem' }} disabled={loading}>
-            {loading ? <Loader2 size={20} className="animate-spin" /> : (
-              <span style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                {isLogin ? 'Entrar no Painel' : 'Concluir e Entrar na Fila'}
-                <ArrowRight size={18} />
+          <button type="submit" className="btn-primary w-full py-2.5 mt-2" disabled={loading}>
+            {loading ? (
+              <Loader2 size={18} className="animate-spin" />
+            ) : (
+              <span className="flex items-center gap-2">
+                {isLogin ? 'Entrar' : 'Cadastrar e Entrar na Fila'}
+                <ArrowRight size={16} />
               </span>
             )}
           </button>
         </form>
 
-        <div style={{ textAlign: 'center', marginTop: '2rem', borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
-          <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
-            {isLogin ? 'Ainda não é paciente?' : 'Já possui cadastro?'}
+        {/* Toggle */}
+        <div className="text-center mt-6 pt-5 border-t border-[var(--color-border)]">
+          <p className="text-[13px] text-[var(--color-text-secondary)] mb-2">
+            {isLogin ? 'Primeira consulta?' : 'Ja possui cadastro?'}
           </p>
-          <button 
+          <button
             onClick={() => {
               setIsLogin(!isLogin);
               setFormData({ ...formData, cpf: '', birthDate: '', age: '' });
-            }} 
-            className="btn btn-outline"
-            style={{ borderRadius: 'var(--radius-full)', padding: '0.5rem 1.5rem', fontSize: '0.82rem' }}
+            }}
+            className="btn-secondary text-[13px] py-1.5 px-4"
           >
-            {isLogin ? 'Cadastrar Nova Consulta' : 'Acessar meu histórico'}
+            {isLogin ? 'Cadastrar Nova Consulta' : 'Acessar meu historico'}
           </button>
         </div>
       </div>
     </div>
   );
 };
+
+const FormField = ({ label, icon, children }: { label: string; icon?: React.ReactNode; children: React.ReactNode }) => (
+  <div>
+    <label className="flex items-center gap-1.5 text-[12px] font-medium text-[var(--color-text-secondary)] mb-1.5 uppercase tracking-wider">
+      {icon && <span className="text-[var(--color-brand)]">{icon}</span>}
+      {label}
+    </label>
+    {children}
+  </div>
+);
 
 export default PatientLogin;
