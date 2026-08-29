@@ -25,8 +25,20 @@ const app = express();
 
 // -- Middleware de Segurança e CORS --
 app.use(helmet({ contentSecurityPolicy: false })); // Proteção de headers HTTP
+// [SEGURANÇA] CORS restrito a origens explicitamente listadas em CORS_ORIGIN (separadas por vírgula)
+const allowedOrigins = (config.corsOrigin || 'http://localhost:5173')
+  .split(',')
+  .map((o: string) => o.trim())
+  .filter(Boolean);
+
 const corsOptions = {
-  origin: (origin: any, callback: any) => callback(null, true), // Libera conexões WebRTC e API de qualquer IP externo ou origem
+  origin: (origin: any, callback: any) => {
+    // Permite chamadas sem origem (server-to-server, curl, Postman em dev)
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    callback(new Error(`Origem CORS não permitida: ${origin}`));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With']

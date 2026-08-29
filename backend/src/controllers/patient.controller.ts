@@ -11,15 +11,31 @@ export const registerPatient = async (req: Request, res: Response) => {
   try {
     const { name, cpf, age, email, birthDate } = req.body;
     
+    // [SEGURANÇA] Validação e sanitização de inputs
+    if (!name || typeof name !== 'string' || name.trim().length < 2) {
+      return res.status(400).json({ error: 'Nome inválido ou não informado.' });
+    }
+    if (!cpf || typeof cpf !== 'string') {
+      return res.status(400).json({ error: 'CPF é obrigatório.' });
+    }
+
+    const cleanCpf = cpf.replace(/\D/g, '');
+    if (cleanCpf.length !== 11) {
+      return res.status(400).json({ error: 'CPF deve conter 11 dígitos numéricos.' });
+    }
+
+    const cleanName = name.trim().replace(/[<>]/g, ''); // Sanitiza tags HTML básicas
+    const cleanEmail = email && typeof email === 'string' ? email.trim().toLowerCase() : null;
+
     // Insere no PostgreSQL via Prisma
     try {
       const patient = await prisma.patient.create({
         data: {
-          name,
-          cpf,
-          age,
-          email,
-          birth_date: birthDate,
+          name: cleanName,
+          cpf: cleanCpf,
+          age: age ? String(age).replace(/\D/g, '').substring(0, 3) : '',
+          email: cleanEmail,
+          birth_date: birthDate || '',
           has_active_payment: true
         }
       });
@@ -59,10 +75,20 @@ export const getPatientHistory = async (req: any, res: Response) => {
     });
 
     if (!patient) return res.status(404).json({ error: 'Não encontrado' });
-    
-    // Verificação de segurança: paciente só pode ver o próprio histórico
+
+    // [SEGURANÇA] paciente só pode ver o próprio histórico
     if (req.user.role === 'patient' && req.user.id !== patient.id) {
-        return res.status(403).json({ error: 'Acesso negado' });
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+
+    // [SEGURANÇA] médico só pode ver histórico de pacientes que já atendeu
+    if (req.user.role === 'doctor') {
+      const hasRelation = await prisma.consultation.findFirst({
+        where: { patient_id: patient.id, doctor_id: req.user.id }
+      });
+      if (!hasRelation) {
+        return res.status(403).json({ error: 'Acesso negado: este paciente não possui consulta registrada com você.' });
+      }
     }
 
     // Busca paralela para otimização de performance (Prisma Relations)

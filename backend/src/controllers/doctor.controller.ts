@@ -11,9 +11,15 @@ import { BirdIdService } from '../birdid';
  * Cria um atestado médico avulso (usado via API direta).
  * Separa a lógica de inserção no banco da lógica de processamento em background (Fila).
  */
-export const createAtestado = async (req: Request, res: Response) => {
+export const createAtestado = async (req: any, res: Response) => {
   try {
-    const { patientId, doctorId, daysOff, cid, content } = req.body;
+    const { patientId, daysOff, cid, content } = req.body;
+
+    // [SEGURANÇA] doctorId sempre derivado do token JWT — nunca do body
+    const doctorId: string = req.user.id;
+    if (req.user.role !== 'doctor') {
+      return res.status(403).json({ error: 'Apenas médicos podem emitir atestados.' });
+    }
     const validationCode = `MP-${uuidv4().substring(0, 8).toUpperCase()}`;
 
     // Busca nomes para popular o atestado de forma legível
@@ -58,9 +64,15 @@ export const createAtestado = async (req: Request, res: Response) => {
  * 
  * [Padrão Transaction Script] - Operações sequenciais para garantir consistência
  */
-export const endConsultation = async (req: Request, res: Response) => {
+export const endConsultation = async (req: any, res: Response) => {
   try {
-    const { patientId, doctorId, notes, prescriptions, exams, content, atestado } = req.body;
+    const { patientId, notes, prescriptions, exams, content, atestado } = req.body;
+
+    // [SEGURANÇA] doctorId sempre derivado do token JWT — nunca do body
+    const doctorId: string = req.user.id;
+    if (req.user.role !== 'doctor') {
+      return res.status(403).json({ error: 'Apenas médicos podem encerrar consultas.' });
+    }
     const consultationCode = `MP-R-${uuidv4().substring(0, 8).toUpperCase()}`;
 
     // Busca dados do médico para os documentos
@@ -221,9 +233,10 @@ export const validateDocument = async (req: Request, res: Response) => {
 /**
  * Retorna estatísticas simples do médico (consultas no dia e ganhos estimados)
  */
-export const getDoctorStats = async (req: Request, res: Response) => {
+export const getDoctorStats = async (req: any, res: Response) => {
   try {
-    const id = req.params.id as string;
+    // [SEGURANÇA] médico só pode ver as próprias estatísticas — id sempre do token JWT
+    const id: string = req.user.id;
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);

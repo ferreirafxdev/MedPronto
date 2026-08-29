@@ -6,9 +6,20 @@ import { config } from './config';
 export let io: Server;
 
 export function initializeWebSocket(httpServer: HttpServer) {
+  // [SEGURANÇA] CORS do WebSocket restrito às mesmas origens permitidas da API REST
+  const allowedOrigins = (config.corsOrigin || 'http://localhost:5173')
+    .split(',')
+    .map((o: string) => o.trim())
+    .filter(Boolean);
+
   io = new Server(httpServer, {
     cors: {
-      origin: (origin, callback) => callback(null, true),
+      origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+          return callback(null, true);
+        }
+        callback(new Error(`Origem WebSocket não permitida: ${origin}`));
+      },
       methods: ['GET', 'POST'],
       credentials: true
     }

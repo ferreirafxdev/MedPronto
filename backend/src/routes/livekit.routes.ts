@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { AccessToken } from 'livekit-server-sdk';
 import { authenticateToken } from '../middleware/auth.middleware';
 import { config } from '../config';
+import { prisma } from '../utils/db';
 
 const router = Router();
 
@@ -16,7 +17,31 @@ router.post('/token', authenticateToken, async (req: any, res: Response) => {
       return res.status(400).json({ error: 'roomName é obrigatório.' });
     }
 
-    const identity = req.user?.id || `user-${Math.random().toString(36).substring(7)}`;
+    const userRole = req.user?.role;
+    const userId = req.user?.id;
+
+    // [SEGURANÇA] paciente só pode entrar na própria sala (roomName == patient_id)
+    if (userRole === 'patient') {
+      if (roomName !== userId) {
+        return res.status(403).json({ error: 'Paciente só pode acessar a própria sala de atendimento.' });
+      }
+    }
+
+    // [SEGURANÇA] médico só pode entrar em sala de paciente que está atendendo ativamente
+    if (userRole === 'doctor') {
+      const queueEntry = await prisma.queue.findFirst({
+        where: {
+          patient_id: roomName,
+          doctor_id: userId,
+          status: 'in-consultation'
+        }
+      });
+      if (!queueEntry) {
+        return res.status(403).json({ error: 'Médico não está em atendimento ativo com este paciente.' });
+      }
+    }
+
+    const identity = userId || `user-${Math.random().toString(36).substring(7)}`;
     const name = participantName || req.user?.name || identity;
 
     const apiKey = config.livekit.apiKey;

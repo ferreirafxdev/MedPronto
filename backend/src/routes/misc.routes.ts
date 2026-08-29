@@ -29,10 +29,13 @@ router.get('/health', async (req, res) => {
 router.post('/payment/confirm', authenticateToken, async (req: any, res) => {
   try {
     const { patientId } = req.body;
-    
-    // Segurança: paciente só pode confirmar o próprio pagamento
+
+    // [SEGURANÇA] apenas o próprio paciente OU admin podem confirmar pagamento
     if (req.user.role === 'patient' && req.user.id !== patientId) {
       return res.status(403).json({ error: 'Não autorizado' });
+    }
+    if (req.user.role === 'doctor') {
+      return res.status(403).json({ error: 'Médicos não podem confirmar pagamentos de pacientes.' });
     }
 
     // Registra a ativação do pagamento no banco PostgreSQL via Prisma
@@ -52,14 +55,39 @@ router.post('/payment/confirm', authenticateToken, async (req: any, res) => {
 router.post('/documents/signed-url', authenticateToken, async (req: any, res) => {
   try {
     const { key } = req.body;
-    
+
     if (!key) {
       return res.status(400).json({ error: 'Chave do documento é obrigatória.' });
     }
 
+    // [SEGURANÇA] verifica se o documento pertence ao usuário autenticado
+    const userId = req.user.id;
+    const userRole = req.user.role;
+
+    if (userRole !== 'admin') {
+      // Busca o documento nas tabelas de atestados e consultas pelo caminho do arquivo
+      const [atestado, consultation] = await Promise.all([
+        prisma.atestado.findFirst({
+          where: {
+            pdf_path: { contains: key },
+            ...(userRole === 'patient' ? { patient_id: userId } : { doctor_id: userId })
+          }
+        }),
+        prisma.consultation.findFirst({
+          where: {
+            pdf_path: { contains: key },
+            ...(userRole === 'patient' ? { patient_id: userId } : { doctor_id: userId })
+          }
+        })
+      ]);
+
+      if (!atestado && !consultation) {
+        return res.status(403).json({ error: 'Acesso negado: documento não pertence a este usuário.' });
+      }
+    }
+
     // Retorna a URL direta estática do arquivo salvo no servidor
     const url = `/uploads/${key}`;
-    
     res.json({ success: true, url });
   } catch (err: any) {
     console.error('Erro ao buscar URL do documento:', err);
@@ -129,8 +157,12 @@ router.get('/doctor/patient/:patientId/record', authenticateToken, async (req: a
 });
 
 // Endpoint para geração dinâmica e sob demanda de Tokens de Videochamada (VideoSDK)
-router.get('/videosdk/token', authenticateToken, (req, res) => {
+// [SEGURANÇA] apenas médicos podem gerar tokens de videochamada
+router.get('/videosdk/token', authenticateToken, (req: any, res) => {
   try {
+    if (req.user.role !== 'doctor') {
+      return res.status(403).json({ error: 'Apenas médicos podem gerar tokens de videochamada.' });
+    }
     const jwt = require('jsonwebtoken');
     const payload = {
       apikey: config.videosdk.apiKey,

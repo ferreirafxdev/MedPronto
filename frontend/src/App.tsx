@@ -3,9 +3,9 @@ import AppLayout from './layouts/AppLayout';
 import AuthLayout from './layouts/AuthLayout';
 
 // ─── PÁGINAS DE AUTH ─────────────────────────────────────────────────────────
-// LoginPage unifica os antigos AdminLogin, DoctorLogin e PatientLogin.
-// A role é selecionada pelo usuário via tabs dentro do próprio componente.
-import LoginPage from './pages/LoginPage';
+import AdminLogin from './pages/Admin/AdminLogin';
+import DoctorLogin from './pages/Doctor/DoctorLogin';
+import PatientLogin from './pages/Patient/PatientLogin';
 import PatientPayment from './pages/Patient/PatientPayment';
 
 // ─── PÁGINAS INTERNAS (com sidebar / AppLayout) ───────────────────────────────
@@ -30,21 +30,12 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/validar" element={<VerifyDocument />} />
 
-        {/* ── AUTH (AuthLayout com painel decorativo) ─────────────────────────
-            /login           → LoginPage (tab padrão: Paciente)
-            /login?role=...  → LoginPage com tab pré-selecionada
-            /login?mode=register → LoginPage em modo cadastro de paciente
-
-            Aliases das rotas antigas: redirecionam para /login com ?role correto,
-            garantindo compatibilidade com links externos e bookmarks salvos.
-        */}
+        {/* ── AUTH (AuthLayout com painel decorativo) ───────────────────────── */}
         <Route element={<AuthLayout />}>
-          <Route path="/login" element={<LoginPage />} />
-
-          {/* Aliases de compatibilidade — rotas antigas redirecionam para a nova */}
-          <Route path="/admin/login"   element={<Navigate to="/login?role=admin"   replace />} />
-          <Route path="/doctor/login"  element={<Navigate to="/login?role=doctor"  replace />} />
-          <Route path="/patient/login" element={<Navigate to="/login?role=patient" replace />} />
+          <Route path="/admin/login"   element={<AdminLogin />} />
+          <Route path="/doctor/login"  element={<DoctorLogin />} />
+          <Route path="/patient/login" element={<PatientLogin />} />
+          <Route path="/login"         element={<Navigate to="/patient/login" replace />} />
 
           {/* Pagamento do paciente (mantém AuthLayout pois é um passo do fluxo de auth) */}
           <Route path="/patient/payment" element={<PatientPayment />} />

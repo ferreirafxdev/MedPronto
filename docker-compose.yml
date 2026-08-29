@@ -8,7 +8,7 @@ services:
     restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-admin}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin123}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no arquivo .env}
       POSTGRES_DB: ${POSTGRES_DB:-medpronto}
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -58,15 +58,15 @@ services:
     environment:
       PORT: 3001
       NODE_ENV: production
-      DATABASE_URL: postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-admin123}@postgres:5432/${POSTGRES_DB:-medpronto}?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-medpronto}?schema=public
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET:-supersecretmedpronto2026}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
-      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      JWT_SECRET: ${JWT_SECRET:?Defina JWT_SECRET no arquivo .env}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Defina ADMIN_PASSWORD no arquivo .env}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost}
       UPLOADS_DIR: /app/uploads
       LIVEKIT_URL: ${LIVEKIT_URL:-ws://livekit:7880}
-      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-devkey}
-      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-secretsecretsecretsecretsecretsecret}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?Defina LIVEKIT_API_KEY no arquivo .env}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?Defina LIVEKIT_API_SECRET no arquivo .env}
     volumes:
       - uploads_data:/app/uploads
     networks:

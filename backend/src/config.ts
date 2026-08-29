@@ -1,10 +1,26 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-function getEnv(name: string, defaultValue?: string): string {
-  const value = process.env[name] || defaultValue;
-  if (value === undefined || value === null) {
-    return defaultValue !== undefined ? defaultValue : '';
+const INSECURE_DEFAULTS = [
+  'supersecretjwt', 'secretsecretsecretsecretsecretsecret', 'devkey',
+  'admin123', 'supersecretmedpronto2026'
+];
+
+function requireEnv(name: string, insecureDefault?: string): string {
+  const value = process.env[name];
+  if (!value) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        `[CONFIGURAÇÃO] Variável obrigatória ${name} não definida em produção.`
+      );
+    }
+    return insecureDefault || '';
+  }
+  if (process.env.NODE_ENV === 'production' && INSECURE_DEFAULTS.includes(value)) {
+    throw new Error(
+      `[SEGURANÇA] ${name} contém valor inseguro padrão em NODE_ENV=production. ` +
+      `Configure um segredo forte via variável de ambiente.`
+    );
   }
   return value;
 }
@@ -12,8 +28,8 @@ function getEnv(name: string, defaultValue?: string): string {
 export const config = {
   port: parseInt(process.env.PORT || '3001', 10),
   databaseUrl: process.env.DATABASE_URL || '',
-  jwtSecret: process.env.JWT_SECRET || 'supersecretjwt',
-  adminPassword: process.env.ADMIN_PASSWORD || 'admin123',
+  jwtSecret: requireEnv('JWT_SECRET', 'supersecretjwt'),
+  adminPassword: requireEnv('ADMIN_PASSWORD', 'admin123'),
   s3: {
     endpoint: process.env.S3_ENDPOINT || '',
     region: process.env.S3_REGION || 'auto',
@@ -27,11 +43,12 @@ export const config = {
   },
   livekit: {
     url: process.env.LIVEKIT_URL || 'ws://localhost:7880',
-    apiKey: process.env.LIVEKIT_API_KEY || 'devkey',
-    apiSecret: process.env.LIVEKIT_API_SECRET || 'secretsecretsecretsecretsecretsecret',
+    apiKey: requireEnv('LIVEKIT_API_KEY', 'devkey'),
+    apiSecret: requireEnv('LIVEKIT_API_SECRET', 'secretsecretsecretsecretsecretsecret'),
   },
   videosdk: {
-    apiKey: process.env.VIDEOSDK_API_KEY || 'd2f52d5e-33f2-4aa1-bf47-d8f0bca7c8c6',
-    secretKey: process.env.VIDEOSDK_SECRET_KEY || 'b1bf44bb469c610c009c9af4d6b0144db9a18a17c7b040c777c1662a14c91980',
+    // [SEGURANÇA] não há mais valores reais hardcoded como fallback
+    apiKey: process.env.VIDEOSDK_API_KEY || '',
+    secretKey: process.env.VIDEOSDK_SECRET_KEY || '',
   }
 };
